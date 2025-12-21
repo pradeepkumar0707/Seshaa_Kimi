@@ -1,14 +1,15 @@
-import React, { useState, useEffect,useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Home, Users, Store, Search, Plus, Trash2, FileText, Loader, AlertCircle, RefreshCw, Edit, X, Lock } from 'lucide-react';
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCBpjg8nuRri2z4EwzzYyQptEUDikucNEE",
-  authDomain: "keerthana-traders.firebaseapp.com",
-  projectId: "keerthana-traders",
-  storageBucket: "keerthana-traders.firebasestorage.app",
-  messagingSenderId: "44538960020",
-  appId: "1:44538960020:web:34c741f0516219c189fc81"
+  apiKey: "AIzaSyBpXvNm_ZK3-D1BMtHuIxl3A8P8BmX1bbw",
+  authDomain: "pradeepcheck-2c7a5.firebaseapp.com",
+  projectId: "pradeepcheck-2c7a5",
+  storageBucket: "pradeepcheck-2c7a5.firebasestorage.app",
+  messagingSenderId: "398673958396",
+  appId: "1:398673958396:web:de3ce92ac2de2f236c4e79",
+  measurementId: "G-QDLMS98XK2"
 };
 
 // Single authentication password - change this to your desired password
@@ -30,9 +31,9 @@ const KeerthanaTraders = () => {
   const [firebaseReady, setFirebaseReady] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   const [fromDate, setFromDate] = useState("");
-const [toDate, setToDate] = useState("");
-const [statusFilter, setStatusFilter] = useState("Completed"); 
-const [statementData, setStatementData] = useState([]);
+  const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Completed");
+  const [statementData, setStatementData] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -58,96 +59,96 @@ const [statementData, setStatementData] = useState([]);
 
 
   const generateStatement = () => {
-  if (!fromDate) {
-    alert("Please select From Date");
-    return;
-  }
+    if (!fromDate) {
+      alert("Please select From Date");
+      return;
+    }
 
-  const clearStatementFilters = () => {
-  setFromDate("");
-  setToDate("");
-  setStatusFilter("Completed");   // change to "All" if you want
-  setStatementType("All");
-  setStatementData([]);
-};
+    const clearStatementFilters = () => {
+      setFromDate("");
+      setToDate("");
+      setStatusFilter("Completed");   // change to "All" if you want
+      setStatementType("All");
+      setStatementData([]);
+    };
 
 
-  const start = fromDate;
-  const end = toDate || fromDate;
+    const start = fromDate;
+    const end = toDate || fromDate;
 
-  const statusMatch = (status) => {
-    if (statusFilter === "All") return true;
-    if (statusFilter === "Completed") return status === "Completed";
-    return status !== "Completed";
+    const statusMatch = (status) => {
+      if (statusFilter === "All") return true;
+      if (statusFilter === "Completed") return status === "Completed";
+      return status !== "Completed";
+    };
+
+    const mapRow = (r, type) => ({
+      Date: r.date,
+      Name: r.name,
+      Address: r.address,
+      Type: type,
+      Status: r.status,
+      Item: r.things,
+      Kilos: r.kilos,
+      Amount: r.totalAmount,
+    });
+
+    let data = [];
+
+    if (statementType === "All" || statementType === "Farmer") {
+      data.push(
+        ...farmers
+          .filter(r =>
+            statusMatch(r.status) &&
+            r.date >= start &&
+            r.date <= end
+          )
+          .map(r => mapRow(r, "Farmer"))
+      );
+    }
+
+    if (statementType === "All" || statementType === "Dealer") {
+      data.push(
+        ...dealers
+          .filter(r =>
+            statusMatch(r.status) &&
+            r.date >= start &&
+            r.date <= end
+          )
+          .map(r => mapRow(r, "Dealer"))
+      );
+    }
+
+    setStatementData(data);
   };
 
-  const mapRow = (r, type) => ({
-    Date: r.date,
-    Name: r.name,
-    Address: r.address,
-    Type: type,
-    Status: r.status,
-    Item: r.things,
-    Kilos: r.kilos,
-    Amount: r.totalAmount,
-  });
-
-  let data = [];
-
-  if (statementType === "All" || statementType === "Farmer") {
-    data.push(
-      ...farmers
-        .filter(r =>
-          statusMatch(r.status) &&
-          r.date >= start &&
-          r.date <= end
-        )
-        .map(r => mapRow(r, "Farmer"))
-    );
-  }
-
-  if (statementType === "All" || statementType === "Dealer") {
-    data.push(
-      ...dealers
-        .filter(r =>
-          statusMatch(r.status) &&
-          r.date >= start &&
-          r.date <= end
-        )
-        .map(r => mapRow(r, "Dealer"))
-    );
-  }
-
-  setStatementData(data);
-};
-
-const clearStatementFilters = () => {
-  setFromDate("");
-  setToDate("");
-  setStatusFilter("Completed"); // or "All"
-  setStatementType("All");
-  setStatementData([]);
-};
+  const clearStatementFilters = () => {
+    setFromDate("");
+    setToDate("");
+    setStatusFilter("Completed"); // or "All"
+    setStatementType("All");
+    setStatementData([]);
+  };
 
 
 
-const downloadExcel = () => {
-  if (statementData.length === 0) {
-    alert("No data to export");
-    return;
-  }
+  const downloadExcel = () => {
+    if (statementData.length === 0) {
+      alert("No data to export");
+      return;
+    }
 
-  const ws = XLSX.utils.json_to_sheet(statementData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Statement");
+    const ws = XLSX.utils.json_to_sheet(statementData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Statement");
 
-  const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-  const blob = new Blob([buffer], { type: "application/octet-stream" });
-// All | Farmer | Dealer
+    const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([buffer], { type: "application/octet-stream" });
+    // All | Farmer | Dealer
 
 
-  saveAs(blob, "Statement.xlsx");
-};
+    saveAs(blob, "Statement.xlsx");
+  };
 
 
 
@@ -444,30 +445,30 @@ const downloadExcel = () => {
       }
     }
   };
-const clean = (str) => {
-  if (!str) return "";
-  return str.trim();
-};
+  const clean = (str) => {
+    if (!str) return "";
+    return str.trim();
+  };
 
-let allBrokerNames = [];
+  let allBrokerNames = [];
 
-if (activeTab === "farmers") {
-  allBrokerNames = [
-    ...new Set(
-      farmers
-        .map(f => clean(f.brokerName))
-        .filter(b => b !== "")
-    )
-  ];
-} else if (activeTab === "dealers") {
-  allBrokerNames = [
-    ...new Set(
-      dealers
-        .map(d => clean(d.brokerName))
-        .filter(b => b !== "")
-    )
-  ];
-}
+  if (activeTab === "farmers") {
+    allBrokerNames = [
+      ...new Set(
+        farmers
+          .map(f => clean(f.brokerName))
+          .filter(b => b !== "")
+      )
+    ];
+  } else if (activeTab === "dealers") {
+    allBrokerNames = [
+      ...new Set(
+        dealers
+          .map(d => clean(d.brokerName))
+          .filter(b => b !== "")
+      )
+    ];
+  }
 
 
 
@@ -550,7 +551,7 @@ if (activeTab === "farmers") {
 
   const printRecord = (record) => {
 
-  const header = `<b>         
+    const header = `<b>         
     கீர்த்தனா டிரேடர்ஸ்   
     1-6A, Police Station Road, 
     Pudur - 628905     
@@ -558,53 +559,53 @@ if (activeTab === "farmers") {
     ------------------------------------------------
   </b>`;
 
-  const getWidth = (text) => {
-    let width = 0;
-    for (let ch of text) {
-      width += ch.charCodeAt(0) > 256 ? 2 : 1;
-    }
-    return width;
-  };
+    const getWidth = (text) => {
+      let width = 0;
+      for (let ch of text) {
+        width += ch.charCodeAt(0) > 256 ? 2 : 1;
+      }
+      return width;
+    };
 
-  const COLON_COLUMN = 2;
+    const COLON_COLUMN = 2;
 
-  const makeLine = (label, value) => {
-    const labelWidth = getWidth(label);
-    let spaces = COLON_COLUMN - labelWidth;
-    if (spaces < 1) spaces = 1;
+    const makeLine = (label, value) => {
+      const labelWidth = getWidth(label);
+      let spaces = COLON_COLUMN - labelWidth;
+      if (spaces < 1) spaces = 1;
 
-    return `<span style="font-weight:700;">${label}</span>${" ".repeat(spaces)}: <span style="font-weight:700;">${value}</span>\n`;
-  };
+      return `<span style="font-weight:700;">${label}</span>${" ".repeat(spaces)}: <span style="font-weight:700;">${value}</span>\n`;
+    };
 
-  const formatIndianDate = (dateStr) => {
-  if (!dateStr) return "";
-  const [year, month, day] = dateStr.split("-");
-  return `${day}-${month}-${year}`;
-};
+    const formatIndianDate = (dateStr) => {
+      if (!dateStr) return "";
+      const [year, month, day] = dateStr.split("-");
+      return `${day}-${month}-${year}`;
+    };
 
-let priceText = (record.pricePerKilo || "")
-  .replace(/[\r\n]/g, "")   // remove hidden newlines
-  .replace(/\s+/g, " ")     // remove unwanted spaces
-  .trim();
+    let priceText = (record.pricePerKilo || "")
+      .replace(/[\r\n]/g, "")   // remove hidden newlines
+      .replace(/\s+/g, " ")     // remove unwanted spaces
+      .trim();
 
-const formatThingsLine = (things) => {
-  if (!things) return `<b>பொருள் : -\n</b>`;
+    const formatThingsLine = (things) => {
+      if (!things) return `<b>பொருள் : -\n</b>`;
 
-  // single item → same line
-  if (!things.includes(",")) {
-    return `<b>பொருள் : ${things}\n</b>`;
-  }
+      // single item → same line
+      if (!things.includes(",")) {
+        return `<b>பொருள் : ${things}\n</b>`;
+      }
 
-  // multiple items → next line, indented
-  return `<b>பொருள் :\n     ${things}\n</b>`;
-};
-
-
+      // multiple items → next line, indented
+      return `<b>பொருள் :\n     ${things}\n</b>`;
+    };
 
 
-const thingsLine = formatThingsLine(record.things);
 
-  const text = `${header}
+
+    const thingsLine = formatThingsLine(record.things);
+
+    const text = `${header}
     ${makeLine("பெயர்", record.name)}
     ${makeLine("முகவரி", record.address)}
     ${makeLine("தேதி", formatIndianDate(record.date))}
@@ -612,10 +613,10 @@ const thingsLine = formatThingsLine(record.things);
     ${record.numberOfBags ? makeLine("பை எண்ணிக்கை", record.numberOfBags) : ""}
     ${makeLine("எடை", record.kilos || "-")}
     ${record.pricePerKilo ? (
-    priceText.includes(",")
-    ? `<b>ஒரு குவிண்டால் விலை :\n    ${priceText.replace(/,/g, ",\n    ")}\n</b>`
-    : `<b>ஒரு குவிண்டால் விலை : ${priceText}\n</b>`
-) : ""}
+        priceText.includes(",")
+          ? `<b>ஒரு குவிண்டால் விலை :\n    ${priceText.replace(/,/g, ",\n    ")}\n</b>`
+          : `<b>ஒரு குவிண்டால் விலை : ${priceText}\n</b>`
+      ) : ""}
     ${makeLine("மொத்த தொகை", "" + (record.totalAmount || "0"))}
     ${makeLine("நிலுவை தொகை", "" + (record.pendingAmount || "0"))}
     ${makeLine("Status", record.status)}
@@ -627,15 +628,15 @@ const thingsLine = formatThingsLine(record.things);
     <b> நன்றி! மீண்டும் வருக </b>
   `;
 
-  const win = window.open("", "", "fullscreen=yes");
-  win.document.write(`
+    const win = window.open("", "", "fullscreen=yes");
+    win.document.write(`
     <pre style="font-size:14px; font-family:monospace; white-space:pre; margin:0; padding:0;">
 ${text}
     </pre>
     <script>window.onload = () => window.print();</script>
   `);
-  win.document.close();
-};
+    win.document.close();
+  };
 
 
   const filteredFarmers = farmers
@@ -767,12 +768,39 @@ ${text}
                   The Cloud Firestore API needs to be enabled for your Firebase project. Please follow these steps:
                 </p>
                 <ol className="text-orange-700 space-y-2 mb-4 ml-4 list-decimal">
-                  <li>Click this link: <a href="https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=keerthana-traders" target="_blank" rel="noopener noreferrer" className="underline font-medium">Enable Firestore API</a></li>
+                  <li>
+                    Click this link:
+                    <a
+                      href="https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=pradeepcheck-2c7a5"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline font-medium"
+                    >
+                      Enable Firestore API
+                    </a>
+                  </li>
+
                   <li>Click the "ENABLE" button</li>
-                  <li>Go to <a href="https://console.firebase.google.com/project/keerthana-traders/firestore" target="_blank" rel="noopener noreferrer" className="underline font-medium">Firebase Console</a></li>
-                  <li>Create a Firestore Database (choose "Start in test mode")</li>
-                  <li>Wait 2-3 minutes, then click the "Retry Connection" button below</li>
+
+                  <li>
+                    Go to
+                    <a
+                      href="https://console.firebase.google.com/project/pradeepcheck-2c7a5/firestore"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline font-medium"
+                    >
+                      Firebase Console
+                    </a>
+                  </li>
+
+                  <li>Create a Firestore Database (Production mode)</li>
+
+                  <li>Configure Firestore Rules and publish</li>
+
+                  <li>Wait 1–2 minutes, then click the "Retry Connection" button below</li>
                 </ol>
+
                 <button
                   onClick={initFirebase}
                   className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition"
@@ -837,122 +865,122 @@ ${text}
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-       {activeTab === 'home' && (
-  <div className="bg-white p-6 rounded-xl shadow space-y-4">
+        {activeTab === 'home' && (
+          <div className="bg-white p-6 rounded-xl shadow space-y-4">
 
-    <h2 className="text-2xl font-bold">📑 Statement</h2>
+            <h2 className="text-2xl font-bold">📑 Statement</h2>
 
-    {/* Status Filter */}
-    <div className="flex gap-3">
-      {["Completed", "Incompleted", "All"].map(s => (
-        <button
-          key={s}
-          onClick={() => setStatusFilter(s)}
-          className={`px-4 py-1 rounded-full border
+            {/* Status Filter */}
+            <div className="flex gap-3">
+              {["Completed", "Incompleted", "All"].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`px-4 py-1 rounded-full border
             ${statusFilter === s
-              ? "bg-blue-600 text-white"
-              : "bg-white text-gray-700"}`}
-        >
-          {s}
-        </button>
-      ))}
-    </div>
-
-    {/* Farmer / Dealer Filter */}
-<div className="flex gap-3">
-  {["All", "Farmer", "Dealer"].map(t => (
-    <button
-      key={t}
-      onClick={() => setStatementType(t)}
-      className={`px-4 py-1 rounded-full border
-        ${statementType === t
-          ? "bg-purple-600 text-white"
-          : "bg-white text-gray-700"}`}
-    >
-      {t}
-    </button>
-  ))}
-</div>
-
-
-    {/* Date Inputs */}
-    <div className="flex gap-4">
-      <input
-        type="date"
-        value={fromDate}
-        onChange={(e) => setFromDate(e.target.value)}
-        className="border px-3 py-2 rounded"
-      />
-
-      <input
-        type="date"
-        value={toDate}
-        onChange={(e) => setToDate(e.target.value)}
-        className="border px-3 py-2 rounded"
-      />
-
-     <div className="flex gap-3">
-  <button
-    onClick={generateStatement}
-    className="bg-blue-600 text-white px-4 py-2 rounded"
-  >
-    Enter
-  </button>
-
-  <button
-    onClick={clearStatementFilters}
-    className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-  >
-    Clear
-  </button>
-</div>
-
-    </div>
-
-    {/* Statement Table */}
-    {statementData.length > 0 && (
-      <>
-        <div className="overflow-auto border rounded">
-          <table className="w-full border-collapse">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border p-2">Date</th>
-                <th className="border p-2">Name</th>
-                <th className="border p-2">Type</th>
-                <th className="border p-2">Status</th>
-                <th className="border p-2">Item</th>
-                <th className="border p-2">Kilos</th>
-                <th className="border p-2">Amount</th>
-                <th className="border p-2">Address</th>
-              </tr>
-            </thead>
-            <tbody>
-              {statementData.map((r, i) => (
-                <tr key={i}>
-                  <td className="border p-2">{r.Date}</td>
-                  <td className="border p-2">{r.Name}</td>
-                  <td className="border p-2">{r.Type}</td>
-                  <td className="border p-2">{r.Status}</td>
-                  <td className="border p-2">{r.Item}</td>
-                  <td className="border p-2">{r.Kilos}</td>
-                  <td className="border p-2">₹{r.Amount}</td>
-                  <td className="border p-2">{r.Address}</td>
-                </tr>
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-700"}`}
+                >
+                  {s}
+                </button>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
 
-        <button
-          onClick={downloadExcel}
-          className="bg-green-600 text-white px-4 py-2 rounded"
-        >
-          ⬇ Download Excel
-        </button>
-      </>
-    )}
-  </div>
-)}
+            {/* Farmer / Dealer Filter */}
+            <div className="flex gap-3">
+              {["All", "Farmer", "Dealer"].map(t => (
+                <button
+                  key={t}
+                  onClick={() => setStatementType(t)}
+                  className={`px-4 py-1 rounded-full border
+        ${statementType === t
+                      ? "bg-purple-600 text-white"
+                      : "bg-white text-gray-700"}`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+
+            {/* Date Inputs */}
+            <div className="flex gap-4">
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="border px-3 py-2 rounded"
+              />
+
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="border px-3 py-2 rounded"
+              />
+
+              <div className="flex gap-3">
+                <button
+                  onClick={generateStatement}
+                  className="bg-blue-600 text-white px-4 py-2 rounded"
+                >
+                  Enter
+                </button>
+
+                <button
+                  onClick={clearStatementFilters}
+                  className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+                >
+                  Clear
+                </button>
+              </div>
+
+            </div>
+
+            {/* Statement Table */}
+            {statementData.length > 0 && (
+              <>
+                <div className="overflow-auto border rounded">
+                  <table className="w-full border-collapse">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="border p-2">Date</th>
+                        <th className="border p-2">Name</th>
+                        <th className="border p-2">Type</th>
+                        <th className="border p-2">Status</th>
+                        <th className="border p-2">Item</th>
+                        <th className="border p-2">Kilos</th>
+                        <th className="border p-2">Amount</th>
+                        <th className="border p-2">Address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statementData.map((r, i) => (
+                        <tr key={i}>
+                          <td className="border p-2">{r.Date}</td>
+                          <td className="border p-2">{r.Name}</td>
+                          <td className="border p-2">{r.Type}</td>
+                          <td className="border p-2">{r.Status}</td>
+                          <td className="border p-2">{r.Item}</td>
+                          <td className="border p-2">{r.Kilos}</td>
+                          <td className="border p-2">₹{r.Amount}</td>
+                          <td className="border p-2">{r.Address}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <button
+                  onClick={downloadExcel}
+                  className="bg-green-600 text-white px-4 py-2 rounded"
+                >
+                  ⬇ Download Excel
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
 
 
@@ -1111,12 +1139,12 @@ ${text}
                   </div>
 
                   <input
-  type="text"
-  placeholder="பை எண்ணிக்கை"
-  value={formData.numberOfBags}
-  onChange={(e) => setFormData({ ...formData, numberOfBags: e.target.value })}
-  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
-/>
+                    type="text"
+                    placeholder="பை எண்ணிக்கை"
+                    value={formData.numberOfBags}
+                    onChange={(e) => setFormData({ ...formData, numberOfBags: e.target.value })}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
+                  />
 
                   {activeTab === 'dealers' && (
                     <input

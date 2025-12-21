@@ -4,13 +4,13 @@ import { getStorage } from "firebase/storage";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCBpjg8nuRri2z4EwzzYyQptEUDikucNEE",
-  authDomain: "keerthana-traders.firebaseapp.com",
-  projectId: "keerthana-traders",
-  storageBucket: "keerthana-traders.firebasestorage.app",
-  messagingSenderId: "44538960020",
-  appId: "1:44538960020:web:34c741f0516219c189fc81",
-  measurementId: "G-BJ3PQ115X7"
+ apiKey: "AIzaSyBpXvNm_ZK3-D1BMtHuIxl3A8P8BmX1bbw",
+  authDomain: "pradeepcheck-2c7a5.firebaseapp.com",
+  projectId: "pradeepcheck-2c7a5",
+  storageBucket: "pradeepcheck-2c7a5.firebasestorage.app",
+  messagingSenderId: "398673958396",
+  appId: "1:398673958396:web:de3ce92ac2de2f236c4e79",
+  measurementId: "G-QDLMS98XK2"
 };
 
 const app = initializeApp(firebaseConfig);
