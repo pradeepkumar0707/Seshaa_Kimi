@@ -200,25 +200,34 @@ const KeerthanaTraders = () => {
     saveAs(blob, "Statement.xlsx");
   };
 
-  useEffect(() => {
-    if (!formData.name || !formData.address) return;
+ useEffect(() => {
+  if (!formData.name || !formData.address) return;
 
-    const type = activeTab === "farmers" ? "Farmer" : "Dealer";
+  // 🚫 Do not auto apply if user is typing in wrong tab
+  if (activeTab !== "farmers" && activeTab !== "dealers") return;
 
-    const matchedDebt = debts.find(d =>
-      d.type === type &&
-      d.status === "Unlinked" &&
-      d.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
-      d.address.trim().toLowerCase() === formData.address.trim().toLowerCase()
-    );
+  const expectedType = activeTab === "farmers" ? "Farmer" : "Dealer";
 
-    if (matchedDebt) {
-      setFormData(prev => ({
-        ...prev,
-        pendingAmount: matchedDebt.amount
-      }));
-    }
-  }, [formData.name, formData.address, activeTab, debts]);
+  const matchedDebt = debts.find(d =>
+    d.type === expectedType &&
+    d.status === "Unlinked" &&
+    d.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
+    d.address.trim().toLowerCase() === formData.address.trim().toLowerCase()
+  );
+
+  if (matchedDebt) {
+    setFormData(prev => ({
+      ...prev,
+      pendingAmount: matchedDebt.amount
+    }));
+  } else {
+    // ✅ clear pending amount if no matching debt
+    setFormData(prev => ({
+      ...prev,
+      pendingAmount: ""
+    }));
+  }
+}, [formData.name, formData.address, activeTab, debts]);
 
 
   // Check if user was previously authenticated
@@ -642,12 +651,15 @@ const showToast = (message, type = "success") => {
     let updatedFormData = { ...formData };
 
     // 🔍 FIND MATCHING DEBT BY ADDRESS
-    const matchedDebt = debts.find(d =>
-      d.type === recordType &&
-      d.status === "Unlinked" &&
-      d.address.trim().toLowerCase() ===
-      formData.address.trim().toLowerCase()
-    );
+   const matchedDebt = debts.find(d =>
+  d.type === recordType &&              // 👈 MUST MATCH TAB TYPE
+  d.status === "Unlinked" &&
+  d.name.trim().toLowerCase() ===
+    formData.name.trim().toLowerCase() &&
+  d.address.trim().toLowerCase() ===
+    formData.address.trim().toLowerCase()
+);
+
 
     // =========================
     // 💰 AUTO APPLY DEBT
@@ -1446,12 +1458,12 @@ ${text}
       </h3>
 
       <div className="space-y-2 text-sm">
-        <p><b>Name:</b> {viewDebt.name}</p>
-        <p><b>Address:</b> {viewDebt.address}</p>
+        <p><b>பெயர்:</b> {viewDebt.name}</p>
+        <p><b>முகவரி:</b> {viewDebt.address}</p>
         <p><b>Type:</b> {viewDebt.type}</p>
         <p><b>Date:</b> {viewDebt.date}</p>
         <p className="text-red-600 font-bold">
-          Amount: ₹{viewDebt.amount}
+          தொகை: ₹{viewDebt.amount}
         </p>
         <p><b>Status:</b> {viewDebt.status}</p>
         {viewDebt.notes && <p><b>Notes:</b> {viewDebt.notes}</p>}
