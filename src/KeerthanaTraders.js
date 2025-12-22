@@ -39,6 +39,8 @@ const KeerthanaTraders = () => {
   const [editingDebt, setEditingDebt] = useState(null);
   const [debtSearch, setDebtSearch] = useState("");
   const [debtSearchDate, setDebtSearchDate] = useState("");
+  const [viewDebt, setViewDebt] = useState(null);
+
 
   const [debtForm, setDebtForm] = useState({
     name: "",
@@ -323,6 +325,20 @@ const KeerthanaTraders = () => {
   const [showOthers, setShowOthers] = useState(false);
   const [customThing, setCustomThing] = useState("");
 
+  const [toast, setToast] = useState({
+  show: false,
+  message: "",
+  type: "success" // success | error
+});
+const showToast = (message, type = "success") => {
+  setToast({ show: true, message, type });
+
+  setTimeout(() => {
+    setToast({ show: false, message: "", type });
+  }, 2500);
+};
+
+
 
   const handleThingSelect = (item) => {
     let selected = formData.things ? formData.things.split(",") : [];
@@ -539,26 +555,38 @@ const KeerthanaTraders = () => {
     }
   };
 
-  const handleDebtSubmit = async (e) => {
-    e.preventDefault();
+ const handleDebtSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!debtForm.name || !debtForm.address || !debtForm.amount) {
-      alert("Name, Address, Amount required");
-      return;
-    }
+  if (!debtForm.name || !debtForm.address || !debtForm.amount) {
+    showToast("Name, Address & Amount required", "error");
+    return;
+  }
 
+  try {
+    // ✏️ UPDATE
     if (editingDebt) {
-      await updateDebt(editingDebt.id, {
-        ...debtForm,
-        amount: Number(debtForm.amount)
-      });
+      await firestoreFunctions.updateDoc(
+        firestoreFunctions.doc(db, "debts", editingDebt.id),
+        {
+          ...debtForm,
+          amount: Number(debtForm.amount),
+          updatedAt: new Date().toISOString()
+        }
+      );
 
-      resetDebtForm();   // ✅ single source of truth
+      setDebts(debts.map(d =>
+        d.id === editingDebt.id
+          ? { ...d, ...debtForm, amount: Number(debtForm.amount) }
+          : d
+      ));
+
+      showToast("✅ Debt updated successfully");
+      resetDebtForm();
       return;
     }
 
-
-
+    // ➕ ADD
     const docRef = await firestoreFunctions.addDoc(
       firestoreFunctions.collection(db, "debts"),
       {
@@ -570,19 +598,24 @@ const KeerthanaTraders = () => {
     );
 
     setDebts(prev => [
-      { id: docRef.id, ...debtForm, amount: Number(debtForm.amount), status: "Unlinked" },
+      {
+        id: docRef.id,
+        ...debtForm,
+        amount: Number(debtForm.amount),
+        status: "Unlinked"
+      },
       ...prev
     ]);
 
-    setDebtForm({
-      name: "",
-      address: "",
-      type: "Farmer",
-      amount: "",
-      date: new Date().toISOString().split("T")[0],
-      notes: ""
-    });
-  };
+    showToast("➕ Debt added successfully");
+    resetDebtForm();
+
+  } catch (err) {
+    console.error(err);
+    showToast("❌ Failed to save debt", "error");
+  }
+};
+
 
 
 
@@ -706,14 +739,16 @@ const KeerthanaTraders = () => {
   };
 
   const handleDebtDelete = async (id) => {
-    if (!window.confirm("Delete this debt?")) return;
+  if (!window.confirm("Delete this debt?")) return;
 
-    await firestoreFunctions.deleteDoc(
-      firestoreFunctions.doc(db, "debts", id)
-    );
+  await firestoreFunctions.deleteDoc(
+    firestoreFunctions.doc(db, "debts", id)
+  );
 
-    setDebts(debts.filter(d => d.id !== id));
-  };
+  setDebts(debts.filter(d => d.id !== id));
+  showToast("🗑️ Debt deleted");
+};
+
 
 
 
@@ -975,6 +1010,15 @@ ${text}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50">
+        {toast.show && (
+      <div
+        className={`fixed top-5 right-5 z-50 px-4 py-2 rounded-lg shadow-lg text-white
+          ${toast.type === "success" ? "bg-green-600" : "bg-red-600"}
+        `}
+      >
+        {toast.message}
+      </div>
+    )}
       {/* Header */}
       <header className="bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg">
         <div className="container mx-auto px-4 py-6">
@@ -1365,26 +1409,64 @@ ${text}
                     <p className="text-xs text-gray-500">Status: {d.status}</p>
                   </div>
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleDebtEdit(d)}
-                      className="text-blue-600 hover:text-blue-800"
-                      title="Edit"
-                    >
-                      ✏️
-                    </button>
+                 <div className="flex gap-3">
+  <button
+    onClick={() => setViewDebt(d)}
+    className="text-green-600 hover:text-green-800"
+    title="View"
+  >
+    👁️
+  </button>
 
-                    <button
-                      onClick={() => handleDebtDelete(d.id)}
-                      className="text-red-600 hover:text-red-800"
-                      title="Delete"
-                    >
-                      🗑️
-                    </button>
-                  </div>
+  <button
+    onClick={() => handleDebtEdit(d)}
+    className="text-blue-600 hover:text-blue-800"
+    title="Edit"
+  >
+    ✏️
+  </button>
+
+  <button
+    onClick={() => handleDebtDelete(d.id)}
+    className="text-red-600 hover:text-red-800"
+    title="Delete"
+  >
+    🗑️
+  </button>
+</div>
+
                 </div>
               ))
             )}
+            {viewDebt && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+      <h3 className="text-xl font-bold mb-4 text-orange-600">
+        💰 Debt Details
+      </h3>
+
+      <div className="space-y-2 text-sm">
+        <p><b>Name:</b> {viewDebt.name}</p>
+        <p><b>Address:</b> {viewDebt.address}</p>
+        <p><b>Type:</b> {viewDebt.type}</p>
+        <p><b>Date:</b> {viewDebt.date}</p>
+        <p className="text-red-600 font-bold">
+          Amount: ₹{viewDebt.amount}
+        </p>
+        <p><b>Status:</b> {viewDebt.status}</p>
+        {viewDebt.notes && <p><b>Notes:</b> {viewDebt.notes}</p>}
+      </div>
+
+      <button
+        onClick={() => setViewDebt(null)}
+        className="mt-5 w-full bg-gray-600 text-white py-2 rounded"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+
           </div>
         )}
         {(activeTab === 'farmers' || activeTab === 'dealers') && (
