@@ -22,6 +22,7 @@ const KeerthanaTraders = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [farmers, setFarmers] = useState([]);
   const [dealers, setDealers] = useState([]);
+  const [debts, setDebts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
@@ -34,6 +35,37 @@ const KeerthanaTraders = () => {
   const [toDate, setToDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("Completed");
   const [statementData, setStatementData] = useState([]);
+  const [debtTypeFilter, setDebtTypeFilter] = useState("All");
+  const [editingDebt, setEditingDebt] = useState(null);
+  const [debtSearch, setDebtSearch] = useState("");
+  const [debtSearchDate, setDebtSearchDate] = useState("");
+
+  const [debtForm, setDebtForm] = useState({
+    name: "",
+    address: "",
+    type: "Farmer",
+    amount: "",
+    date: new Date().toISOString().split("T")[0], // ✅ ADD
+    notes: ""
+  });
+
+  const filteredDebts = debts
+    .filter(d => debtTypeFilter === "All" || d.type === debtTypeFilter)
+    .filter(d =>
+      d.name.toLowerCase().includes(debtSearch.toLowerCase()) ||
+      d.address.toLowerCase().includes(debtSearch.toLowerCase())
+    )
+    .filter(d => debtSearchDate ? d.date === debtSearchDate : true)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const handleDebtChange = (e) => {
+    const { name, value } = e.target;
+    setDebtForm(prev => ({ ...prev, [name]: value }));
+  };
+
+
+
+
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -63,6 +95,9 @@ const KeerthanaTraders = () => {
       alert("Please select From Date");
       return;
     }
+
+
+
 
     const clearStatementFilters = () => {
       setFromDate("");
@@ -130,6 +165,19 @@ const KeerthanaTraders = () => {
     setStatementData([]);
   };
 
+  const resetDebtForm = () => {
+    setEditingDebt(null);
+    setDebtForm({
+      name: "",
+      address: "",
+      type: "Farmer",
+      amount: "",
+      date: new Date().toISOString().split("T")[0],
+      notes: ""
+    });
+  };
+
+
 
 
   const downloadExcel = () => {
@@ -150,6 +198,25 @@ const KeerthanaTraders = () => {
     saveAs(blob, "Statement.xlsx");
   };
 
+  useEffect(() => {
+    if (!formData.name || !formData.address) return;
+
+    const type = activeTab === "farmers" ? "Farmer" : "Dealer";
+
+    const matchedDebt = debts.find(d =>
+      d.type === type &&
+      d.status === "Unlinked" &&
+      d.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
+      d.address.trim().toLowerCase() === formData.address.trim().toLowerCase()
+    );
+
+    if (matchedDebt) {
+      setFormData(prev => ({
+        ...prev,
+        pendingAmount: matchedDebt.amount
+      }));
+    }
+  }, [formData.name, formData.address, activeTab, debts]);
 
 
   // Check if user was previously authenticated
@@ -312,29 +379,44 @@ const KeerthanaTraders = () => {
 
   const loadData = async (database, functions) => {
     try {
-      // Fetch farmers
-      const farmersSnapshot = await functions.getDocs(functions.collection(database, 'farmers'));
+      // Farmers
+      const farmersSnapshot = await functions.getDocs(
+        functions.collection(database, "farmers")
+      );
       const farmersData = farmersSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
 
-      // Fetch dealers
-      const dealersSnapshot = await functions.getDocs(functions.collection(database, 'dealers'));
+      // Dealers
+      const dealersSnapshot = await functions.getDocs(
+        functions.collection(database, "dealers")
+      );
       const dealersData = dealersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // ✅ DEBTS
+      const debtsSnapshot = await functions.getDocs(
+        functions.collection(database, "debts")
+      );
+      const debtsData = debtsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
 
       setFarmers(farmersData);
       setDealers(dealersData);
-      setError(null);
+      setDebts(debtsData);
+
       setLoading(false);
     } catch (err) {
-      console.error('Error loading data:', err);
-      throw err; // Re-throw to be caught by initFirebase
+      console.error(err);
+      throw err;
     }
   };
+
 
   const saveToFirebase = async (type, data) => {
     if (!db || !firestoreFunctions) {
@@ -384,6 +466,35 @@ const KeerthanaTraders = () => {
     }
   };
 
+  const saveDebtToFirebase = async (data) => {
+    if (!db || !firestoreFunctions) return;
+
+    const docRef = await firestoreFunctions.addDoc(
+      firestoreFunctions.collection(db, "debts"),
+      {
+        ...data,
+        status: "Unlinked",
+        linkedRecordId: null,
+        createdAt: new Date().toISOString()
+      }
+    );
+
+    setDebts([
+      ...debts,
+      { ...data, id: docRef.id, status: "Unlinked", linkedRecordId: null }
+    ]);
+  };
+
+
+  const findDebtByAddress = (type, address) => {
+    return debts.find(d =>
+      d.type === type &&
+      d.address.trim().toLowerCase() === address.trim().toLowerCase() &&
+      d.status === "Unlinked"
+    );
+  };
+
+
   const updateInFirebase = async (type, id, data) => {
     if (!db || !firestoreFunctions) {
       alert('⚠️ Firebase is not connected. Please refresh the page.');
@@ -428,23 +539,122 @@ const KeerthanaTraders = () => {
     }
   };
 
-  const handleSubmit = () => {
-    if (!formData.name || !formData.address) {
-      alert('⚠️ Please fill in Name and Address (required fields)');
+  const handleDebtSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!debtForm.name || !debtForm.address || !debtForm.amount) {
+      alert("Name, Address, Amount required");
       return;
     }
 
+    if (editingDebt) {
+      await updateDebt(editingDebt.id, {
+        ...debtForm,
+        amount: Number(debtForm.amount)
+      });
+
+      resetDebtForm();   // ✅ single source of truth
+      return;
+    }
+
+
+
+    const docRef = await firestoreFunctions.addDoc(
+      firestoreFunctions.collection(db, "debts"),
+      {
+        ...debtForm,
+        amount: Number(debtForm.amount),
+        status: "Unlinked",
+        createdAt: new Date().toISOString()
+      }
+    );
+
+    setDebts(prev => [
+      { id: docRef.id, ...debtForm, amount: Number(debtForm.amount), status: "Unlinked" },
+      ...prev
+    ]);
+
+    setDebtForm({
+      name: "",
+      address: "",
+      type: "Farmer",
+      amount: "",
+      date: new Date().toISOString().split("T")[0],
+      notes: ""
+    });
+  };
+
+
+
+  const handleSubmit = async () => {
+    if (!formData.name || !formData.address) {
+      alert("⚠️ Please fill Name and Address");
+      return;
+    }
+
+    // =========================
+    // ✏️ EDIT EXISTING RECORD
+    // =========================
     if (editingRecord) {
-      const type = activeTab === 'farmers' ? 'farmer' : 'dealer';
-      updateInFirebase(type, editingRecord.id, formData);
-    } else {
-      if (activeTab === 'farmers') {
-        saveToFirebase('farmer', formData);
-      } else {
-        saveToFirebase('dealer', formData);
+      const type = activeTab === "farmers" ? "farmer" : "dealer";
+      await updateInFirebase(type, editingRecord.id, formData);
+      return;
+    }
+
+    // =========================
+    // ➕ ADD NEW RECORD
+    // =========================
+    const recordType = activeTab === "farmers" ? "Farmer" : "Dealer";
+
+    let updatedFormData = { ...formData };
+
+    // 🔍 FIND MATCHING DEBT BY ADDRESS
+    const matchedDebt = debts.find(d =>
+      d.type === recordType &&
+      d.status === "Unlinked" &&
+      d.address.trim().toLowerCase() ===
+      formData.address.trim().toLowerCase()
+    );
+
+    // =========================
+    // 💰 AUTO APPLY DEBT
+    // =========================
+    if (matchedDebt) {
+      updatedFormData.pendingAmount = matchedDebt.amount;
+
+      try {
+        // 🔗 Mark debt as linked in Firebase
+        await firestoreFunctions.updateDoc(
+          firestoreFunctions.doc(db, "debts", matchedDebt.id),
+          {
+            status: "Linked",
+            linkedAt: new Date().toISOString()
+          }
+        );
+
+        // 🔄 Update local debt state
+        setDebts(debts.map(d =>
+          d.id === matchedDebt.id
+            ? { ...d, status: "Linked" }
+            : d
+        ));
+      } catch (err) {
+        console.error("Debt linking failed", err);
+        alert("❌ Failed to link debt");
+        return;
       }
     }
+
+    // =========================
+    // 💾 SAVE FARMER / DEALER
+    // =========================
+    if (activeTab === "farmers") {
+      await saveToFirebase("farmer", updatedFormData);
+    } else {
+      await saveToFirebase("dealer", updatedFormData);
+    }
   };
+
   const clean = (str) => {
     if (!str) return "";
     return str.trim();
@@ -473,6 +683,39 @@ const KeerthanaTraders = () => {
 
 
   const [searchBroker, setSearchBroker] = useState("");
+
+  const updateDebt = async (id, data) => {
+    await firestoreFunctions.updateDoc(
+      firestoreFunctions.doc(db, "debts", id),
+      data
+    );
+
+    setDebts(debts.map(d => d.id === id ? { ...d, ...data } : d));
+  };
+
+  const handleDebtEdit = (debt) => {
+    setEditingDebt(debt);
+    setDebtForm({
+      name: debt.name,
+      address: debt.address,
+      type: debt.type,
+      amount: debt.amount,
+      date: debt.date,
+      notes: debt.notes || ""
+    });
+  };
+
+  const handleDebtDelete = async (id) => {
+    if (!window.confirm("Delete this debt?")) return;
+
+    await firestoreFunctions.deleteDoc(
+      firestoreFunctions.doc(db, "debts", id)
+    );
+
+    setDebts(debts.filter(d => d.id !== id));
+  };
+
+
 
 
   const handleEdit = (record) => {
@@ -845,7 +1088,8 @@ ${text}
             {[
               { id: 'home', label: 'Home', icon: Home },
               { id: 'farmers', label: 'Farmer', icon: Users },
-              { id: 'dealers', label: 'Dealer', icon: Store }
+              { id: 'dealers', label: 'Dealer', icon: Store },
+              { id: "debts", label: "Debts", icon: FileText }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -982,8 +1226,167 @@ ${text}
           </div>
         )}
 
+        {activeTab === "debts" && (
+          <div className="bg-white p-6 rounded-xl shadow space-y-6">
 
+            <h2 className="text-2xl font-bold text-orange-600">
+              💰 நிலுவை தொகை
+            </h2>
 
+            {/* ➕ ADD / EDIT DEBT FORM */}
+            <form
+              onSubmit={handleDebtSubmit}
+              className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-orange-50 p-4 rounded"
+            >
+              <input
+                name="name"
+                placeholder="பெயர்"
+                value={debtForm.name}
+                onChange={handleDebtChange}
+                className="border p-2 rounded"
+              />
+
+              <input
+                name="address"
+                placeholder="முகவரி"
+                value={debtForm.address}
+                onChange={handleDebtChange}
+                className="border p-2 rounded"
+              />
+
+              <input
+                type="date"
+                name="date"
+                value={debtForm.date}
+                onChange={handleDebtChange}
+                className="border p-2 rounded"
+              />
+
+              <select
+                name="type"
+                value={debtForm.type}
+                onChange={handleDebtChange}
+                className="border p-2 rounded"
+              >
+                <option value="Farmer">Farmer</option>
+                <option value="Dealer">Dealer</option>
+              </select>
+
+              <input
+                name="amount"
+                type="number"
+                placeholder="தொகை"
+                value={debtForm.amount}
+                onChange={handleDebtChange}
+                className="border p-2 rounded"
+              />
+
+              <input
+                name="notes"
+                placeholder="குறிப்பு"
+                value={debtForm.notes}
+                onChange={handleDebtChange}
+                className="border p-2 rounded col-span-full"
+              />
+
+              <div className="col-span-full flex gap-3">
+                <button
+                  type="submit"
+                  className="bg-green-600 text-white py-2 rounded flex-1"
+                >
+                  {editingDebt ? "💾 Update Debt" : "➕ Add Debt"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetDebtForm}
+                  className="bg-gray-400 text-white py-2 rounded flex-1"
+                >
+                  🔄 Reset
+                </button>
+              </div>
+            </form>
+
+            {/* 🔍 COMPACT SEARCH BAR (SEARCH + DATE + TYPE + CLEAR) */}
+            <div className="flex items-center gap-2 border border-gray-300 rounded-lg bg-white px-3 py-2 w-full">
+
+              <input
+                type="text"
+                placeholder="Search name / address"
+                value={debtSearch}
+                onChange={(e) => setDebtSearch(e.target.value)}
+                className="flex-1 outline-none text-sm"
+              />
+
+              <input
+                type="date"
+                value={debtSearchDate}
+                onChange={(e) => setDebtSearchDate(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              />
+
+              <select
+                value={debtTypeFilter}
+                onChange={(e) => setDebtTypeFilter(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value="All">All</option>
+                <option value="Farmer">Farmer</option>
+                <option value="Dealer">Dealer</option>
+              </select>
+
+              <button
+                onClick={() => {
+                  setDebtSearch("");
+                  setDebtSearchDate("");
+                  setDebtTypeFilter("All");
+                }}
+                className="text-sm text-red-600 hover:underline"
+              >
+                Clear
+              </button>
+            </div>
+
+            {/* 📋 DEBT LIST */}
+            {filteredDebts.length === 0 ? (
+              <p className="text-gray-500 text-center">No debts found</p>
+            ) : (
+              filteredDebts.map(d => (
+                <div
+                  key={d.id}
+                  className="border p-4 rounded-lg bg-white flex justify-between items-start"
+                >
+                  <div>
+                    <p className="font-bold">{d.name} ({d.type})</p>
+                    <p className="text-sm">{d.address}</p>
+                    <p className="text-xs text-gray-500">Date: {d.date}</p>
+                    <p className="text-red-600 font-bold">₹ {d.amount}</p>
+                    {d.notes && <p className="text-sm">📝 {d.notes}</p>}
+                    <p className="text-xs text-gray-500">Status: {d.status}</p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleDebtEdit(d)}
+                      className="text-blue-600 hover:text-blue-800"
+                      title="Edit"
+                    >
+                      ✏️
+                    </button>
+
+                    <button
+                      onClick={() => handleDebtDelete(d.id)}
+                      className="text-red-600 hover:text-red-800"
+                      title="Delete"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
         {(activeTab === 'farmers' || activeTab === 'dealers') && (
           <div className="space-y-6">
             <div className="flex justify-between items-center gap-3">
