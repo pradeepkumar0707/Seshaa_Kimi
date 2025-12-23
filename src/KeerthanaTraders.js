@@ -40,6 +40,8 @@ const KeerthanaTraders = () => {
   const [debtSearch, setDebtSearch] = useState("");
   const [debtSearchDate, setDebtSearchDate] = useState("");
   const [viewDebt, setViewDebt] = useState(null);
+  const recordType = activeTab === "farmer" ? "farmers" : "dealers";
+
 
 
   const [debtForm, setDebtForm] = useState({
@@ -158,6 +160,21 @@ const KeerthanaTraders = () => {
 
     setStatementData(data);
   };
+ const parseAmount = (value) => {
+  if (value === null || value === undefined) return 0;
+
+  // If already a number, return it safely
+  if (typeof value === "number") return Math.max(0, value);
+
+  // Convert anything else to string
+  const str = String(value).trim();
+  if (str === "" || str === "-") return 0;
+
+  const cleaned = str.replace(/(?!^-)[^0-9]/g, "");
+  return Number(cleaned || 0);
+};
+
+
 
   const clearStatementFilters = () => {
     setFromDate("");
@@ -200,34 +217,41 @@ const KeerthanaTraders = () => {
     saveAs(blob, "Statement.xlsx");
   };
 
- useEffect(() => {
-  if (!formData.name || !formData.address) return;
+useEffect(() => {
+  // 🛑 DO NOTHING WHEN EDITING
+  if (editingRecord) return;
 
-  // 🚫 Do not auto apply if user is typing in wrong tab
+  if (!formData.name || !formData.address) return;
   if (activeTab !== "farmers" && activeTab !== "dealers") return;
 
   const expectedType = activeTab === "farmers" ? "Farmer" : "Dealer";
 
-  const matchedDebt = debts.find(d =>
-    d.type === expectedType &&
-    d.status === "Unlinked" &&
-    d.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
-    d.address.trim().toLowerCase() === formData.address.trim().toLowerCase()
-  );
+ // 🔍 Find existing farmer (same name + address)
+const existingFarmer = farmers.find(f =>
+  f.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
+  f.address.trim().toLowerCase() === formData.address.trim().toLowerCase()
+);
+
+// 🔍 Find linked debt if farmer exists
+const matchedDebt = existingFarmer
+  ? debts.find(d => d.id === existingFarmer.debtId)
+  : null;
+
 
   if (matchedDebt) {
     setFormData(prev => ({
       ...prev,
       pendingAmount: matchedDebt.amount
     }));
-  } else {
-    // ✅ clear pending amount if no matching debt
-    setFormData(prev => ({
-      ...prev,
-      pendingAmount: ""
-    }));
   }
-}, [formData.name, formData.address, activeTab, debts]);
+}, [
+  formData.name,
+  formData.address,
+  activeTab,
+  debts,
+  editingRecord   // ✅ IMPORTANT
+]);
+
 
 
   // Check if user was previously authenticated
@@ -563,6 +587,29 @@ const showToast = (message, type = "success") => {
       setSaving(false);
     }
   };
+const syncDebtAmount = async (recordType, formData) => {
+  const matchedDebt = debts.find(d =>
+    d.type === recordType &&
+    d.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
+    d.address.trim().toLowerCase() === formData.address.trim().toLowerCase()
+  );
+
+  if (!matchedDebt) return;
+
+  const amount = Math.max(0, Number(formData.pendingAmount || 0));
+
+  await firestoreFunctions.updateDoc(
+    firestoreFunctions.doc(db, "debts", matchedDebt.id),
+    {
+      amount,
+      updatedAt: new Date().toISOString()
+    }
+  );
+
+  setDebts(debts.map(d =>
+    d.id === matchedDebt.id ? { ...d, amount } : d
+  ));
+};
 
  const handleDebtSubmit = async (e) => {
   e.preventDefault();
@@ -579,16 +626,26 @@ const showToast = (message, type = "success") => {
         firestoreFunctions.doc(db, "debts", editingDebt.id),
         {
           ...debtForm,
-          amount: Number(debtForm.amount),
+          amount: Math.max(0, Number(debtForm.amount) || 0),
           updatedAt: new Date().toISOString()
         }
       );
 
-      setDebts(debts.map(d =>
-        d.id === editingDebt.id
-          ? { ...d, ...debtForm, amount: Number(debtForm.amount) }
-          : d
-      ));
+      // 🔥 CREATE UPDATED DEBT OBJECT
+const updatedDebt = {
+  ...editingDebt,
+  ...debtForm,
+  amount: Math.max(0, Number(debtForm.amount))
+};
+
+// 🔁 UPDATE LOCAL DEBTS STATE
+setDebts(debts.map(d =>
+  d.id === editingDebt.id ? updatedDebt : d
+));
+
+// 🔥 SYNC TO FARMER / DEALER
+await syncDebtToRecords(updatedDebt);
+
 
       showToast("✅ Debt updated successfully");
       resetDebtForm();
@@ -625,80 +682,138 @@ const showToast = (message, type = "success") => {
   }
 };
 
+const syncDebtToRecords = async (updatedDebt) => {
+  if (!db || !firestoreFunctions) return;
 
+  const collectionName =
+    updatedDebt.type === "Farmer" ? "farmers" : "dealers";
 
+  const records =
+    updatedDebt.type === "Farmer" ? farmers : dealers;
 
-  const handleSubmit = async () => {
-    if (!formData.name || !formData.address) {
-      alert("⚠️ Please fill Name and Address");
-      return;
+  const matchedRecord = records.find(r =>
+    r.name.trim().toLowerCase() === updatedDebt.name.trim().toLowerCase() &&
+    r.address.trim().toLowerCase() === updatedDebt.address.trim().toLowerCase()
+  );
+
+  if (!matchedRecord) return;
+
+  // 🔥 Update Firebase
+  await firestoreFunctions.updateDoc(
+    firestoreFunctions.doc(db, collectionName, matchedRecord.id),
+    {
+      pendingAmount: updatedDebt.amount,
+      updatedAt: new Date().toISOString()
     }
+  );
 
-    // =========================
-    // ✏️ EDIT EXISTING RECORD
-    // =========================
-    if (editingRecord) {
-      const type = activeTab === "farmers" ? "farmer" : "dealer";
-      await updateInFirebase(type, editingRecord.id, formData);
-      return;
-    }
-
-    // =========================
-    // ➕ ADD NEW RECORD
-    // =========================
-    const recordType = activeTab === "farmers" ? "Farmer" : "Dealer";
-
-    let updatedFormData = { ...formData };
-
-    // 🔍 FIND MATCHING DEBT BY ADDRESS
-   const matchedDebt = debts.find(d =>
-  d.type === recordType &&              // 👈 MUST MATCH TAB TYPE
-  d.status === "Unlinked" &&
-  d.name.trim().toLowerCase() ===
-    formData.name.trim().toLowerCase() &&
-  d.address.trim().toLowerCase() ===
-    formData.address.trim().toLowerCase()
-);
+  // 🔁 Update local state
+  if (updatedDebt.type === "Farmer") {
+    setFarmers(prev =>
+      prev.map(f =>
+        f.id === matchedRecord.id
+          ? { ...f, pendingAmount: updatedDebt.amount }
+          : f
+      )
+    );
+  } else {
+    setDealers(prev =>
+      prev.map(d =>
+        d.id === matchedRecord.id
+          ? { ...d, pendingAmount: updatedDebt.amount }
+          : d
+      )
+    );
+  }
+};
 
 
-    // =========================
-    // 💰 AUTO APPLY DEBT
-    // =========================
+
+
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  try {
+    // 1️⃣ Prepare payload (Farmer / Dealer data)
+    const payload = {
+      name: formData.name.trim(),
+      address: formData.address.trim(),
+      pendingAmount: Number(formData.pendingAmount || 0),
+      type: recordType, // farmer or dealer
+      createdAt: new Date().toISOString()
+    };
+
+    // 2️⃣ Find existing farmer (same name + address)
+    const existingFarmer = farmers.find(f =>
+      f.name.trim().toLowerCase() === payload.name.toLowerCase() &&
+      f.address.trim().toLowerCase() === payload.address.toLowerCase()
+    );
+
+    // 3️⃣ Find linked debt (if farmer already exists)
+    const matchedDebt = existingFarmer?.debtId
+      ? debts.find(d => d.id === existingFarmer.debtId)
+      : null;
+
+    // 4️⃣ UPDATE or CREATE debt
     if (matchedDebt) {
-      updatedFormData.pendingAmount = matchedDebt.amount;
+      // 🔁 Update existing debt (latest value only)
+      await firestoreFunctions.updateDoc(
+        firestoreFunctions.doc(db, "debts", matchedDebt.id),
+        {
+          amount: payload.pendingAmount,
+          updatedAt: new Date().toISOString()
+        }
+      );
 
-      try {
-        // 🔗 Mark debt as linked in Firebase
-        await firestoreFunctions.updateDoc(
-          firestoreFunctions.doc(db, "debts", matchedDebt.id),
-          {
-            status: "Linked",
-            linkedAt: new Date().toISOString()
-          }
-        );
-
-        // 🔄 Update local debt state
-        setDebts(debts.map(d =>
+      // 🔁 Update local state
+      setDebts(prev =>
+        prev.map(d =>
           d.id === matchedDebt.id
-            ? { ...d, status: "Linked" }
+            ? { ...d, amount: payload.pendingAmount }
             : d
-        ));
-      } catch (err) {
-        console.error("Debt linking failed", err);
-        alert("❌ Failed to link debt");
-        return;
-      }
+        )
+      );
+
+      payload.debtId = matchedDebt.id;
+
+    } else {
+      // 🆕 Create new debt (first time farmer)
+      const debtRef = await firestoreFunctions.addDoc(
+        firestoreFunctions.collection(db, "debts"),
+        {
+          name: payload.name,
+          address: payload.address,
+          type: recordType,
+          amount: payload.pendingAmount,
+          createdAt: new Date().toISOString()
+        }
+      );
+
+      payload.debtId = debtRef.id;
     }
 
-    // =========================
-    // 💾 SAVE FARMER / DEALER
-    // =========================
-    if (activeTab === "farmers") {
-      await saveToFirebase("farmer", updatedFormData);
-    } else {
-      await saveToFirebase("dealer", updatedFormData);
-    }
-  };
+    // 5️⃣ Save Farmer / Dealer
+    await firestoreFunctions.addDoc(
+      firestoreFunctions.collection(db, recordType),
+      payload
+    );
+
+    // 6️⃣ Reset form
+    setFormData({
+      name: "",
+      address: "",
+      pendingAmount: ""
+    });
+
+    console.log("✅ Farmer saved & debt synced successfully");
+
+  } catch (error) {
+    console.error("❌ Error saving farmer:", error);
+  }
+};
+
+
+
 
   const clean = (str) => {
     if (!str) return "";
@@ -729,14 +844,7 @@ const showToast = (message, type = "success") => {
 
   const [searchBroker, setSearchBroker] = useState("");
 
-  const updateDebt = async (id, data) => {
-    await firestoreFunctions.updateDoc(
-      firestoreFunctions.doc(db, "debts", id),
-      data
-    );
-
-    setDebts(debts.map(d => d.id === id ? { ...d, ...data } : d));
-  };
+ 
 
   const handleDebtEdit = (debt) => {
     setEditingDebt(debt);
@@ -1329,13 +1437,17 @@ ${text}
               </select>
 
               <input
-                name="amount"
-                type="number"
-                placeholder="தொகை"
-                value={debtForm.amount}
-                onChange={handleDebtChange}
-                className="border p-2 rounded"
-              />
+  name="amount"
+  type="number"
+  value={debtForm.amount}
+  onChange={(e) =>
+    setDebtForm(prev => ({
+      ...prev,
+      amount: e.target.value
+    }))
+  }
+/>
+
 
               <input
                 name="notes"
@@ -1677,7 +1789,13 @@ ${text}
                     type="number"
                     placeholder="நிலுவை தொகை (₹)"
                     value={formData.pendingAmount}
-                    onChange={(e) => setFormData({ ...formData, pendingAmount: e.target.value })}
+                   onChange={e =>
+  setFormData({
+    ...formData,
+    pendingAmount: e.target.value   // 👈 EXACT TEXT
+  })
+}
+
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
                   />
                   <input
