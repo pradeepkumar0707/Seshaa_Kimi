@@ -91,6 +91,12 @@ const KeerthanaTraders = () => {
   const [searchDate, setSearchDate] = useState('');
   const [statementType, setStatementType] = useState("All");
 
+  const toNumber = (v) => {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+};
+
+
 
   const generateStatement = () => {
     if (!fromDate) {
@@ -206,11 +212,11 @@ const KeerthanaTraders = () => {
     const type = activeTab === "farmers" ? "Farmer" : "Dealer";
 
     const matchedDebt = debts.find(d =>
-      d.type === type &&
-      d.status === "Unlinked" &&
-      d.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
-      d.address.trim().toLowerCase() === formData.address.trim().toLowerCase()
-    );
+  d.type === type &&
+  d.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
+  d.address.trim().toLowerCase() === formData.address.trim().toLowerCase()
+);
+
 
     if (matchedDebt) {
       setFormData(prev => ({
@@ -482,80 +488,59 @@ const showToast = (message, type = "success") => {
     }
   };
 
-  const saveDebtToFirebase = async (data) => {
-    if (!db || !firestoreFunctions) return;
-
-    const docRef = await firestoreFunctions.addDoc(
-      firestoreFunctions.collection(db, "debts"),
-      {
-        ...data,
-        status: "Unlinked",
-        linkedRecordId: null,
-        createdAt: new Date().toISOString()
-      }
-    );
-
-    setDebts([
-      ...debts,
-      { ...data, id: docRef.id, status: "Unlinked", linkedRecordId: null }
-    ]);
-  };
-
-
-  const findDebtByAddress = (type, address) => {
-    return debts.find(d =>
-      d.type === type &&
-      d.address.trim().toLowerCase() === address.trim().toLowerCase() &&
-      d.status === "Unlinked"
-    );
-  };
 
 
   const updateInFirebase = async (type, id, data) => {
-    if (!db || !firestoreFunctions) {
-      alert('⚠️ Firebase is not connected. Please refresh the page.');
-      return;
+  if (!db || !firestoreFunctions) return;
+
+  const collectionName = type === "farmer" ? "farmers" : "dealers";
+
+  // 1️⃣ Update Farmer / Dealer
+  await firestoreFunctions.updateDoc(
+    firestoreFunctions.doc(db, collectionName, id),
+    {
+      ...data,
+      pendingAmount: toNumber(data.pendingAmount),
+      updatedAt: new Date().toISOString()
     }
+  );
 
-    setSaving(true);
-    setError(null);
+  // 2️⃣ Update local state
+  if (type === "farmer") {
+    setFarmers(prev =>
+      prev.map(f => f.id === id ? { ...f, ...data } : f)
+    );
+  } else {
+    setDealers(prev =>
+      prev.map(d => d.id === id ? { ...d, ...data } : d)
+    );
+  }
 
-    try {
-      const collectionName = type === 'farmer' ? 'farmers' : 'dealers';
-
-      await firestoreFunctions.updateDoc(
-        firestoreFunctions.doc(db, collectionName, id),
-        {
-          ...data,
-          updatedAt: new Date().toISOString()
-        }
-      );
-
-      // Update local state
-      if (type === 'farmer') {
-        setFarmers(farmers.map(f => f.id === id ? { ...f, ...data } : f));
-      } else {
-        setDealers(dealers.map(d => d.id === id ? { ...d, ...data } : d));
+  // 3️⃣ 🔄 SYNC BACK TO DEBT
+  if (data.debtId) {
+    await firestoreFunctions.updateDoc(
+      firestoreFunctions.doc(db, "debts", data.debtId),
+      {
+        amount: toNumber(data.pendingAmount),
+        updatedAt: new Date().toISOString()
       }
+    );
 
-      alert('✅ Record updated successfully!');
-      cancelEdit();
-    } catch (err) {
-      console.error('Error updating in Firebase:', err);
+    setDebts(prev =>
+      prev.map(d =>
+        d.id === data.debtId
+          ? { ...d, amount: toNumber(data.pendingAmount) }
+          : d
+      )
+    );
+  }
 
-      let errorMsg = 'Failed to update record.';
-      if (err.message.includes('permission-denied')) {
-        errorMsg = 'Permission denied. Please check Firebase security rules.';
-      }
+  alert("✅ Record updated successfully");
+  cancelEdit();
+};
 
-      setError(errorMsg);
-      alert(`❌ ${errorMsg}\n\nError: ${err.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
 
- const handleDebtSubmit = async (e) => {
+const handleDebtSubmit = async (e) => {
   e.preventDefault();
 
   if (!debtForm.name || !debtForm.address || !debtForm.amount) {
@@ -563,130 +548,116 @@ const showToast = (message, type = "success") => {
     return;
   }
 
-  try {
-    // ✏️ UPDATE
-    if (editingDebt) {
-      await firestoreFunctions.updateDoc(
-        firestoreFunctions.doc(db, "debts", editingDebt.id),
-        {
-          ...debtForm,
-          amount: Number(debtForm.amount),
-          updatedAt: new Date().toISOString()
-        }
-      );
+  const cleanAmount = toNumber(debtForm.amount);
 
-      setDebts(debts.map(d =>
-        d.id === editingDebt.id
-          ? { ...d, ...debtForm, amount: Number(debtForm.amount) }
-          : d
-      ));
-
-      showToast("✅ Debt updated successfully");
-      resetDebtForm();
-      return;
-    }
-
-    // ➕ ADD
-    const docRef = await firestoreFunctions.addDoc(
-      firestoreFunctions.collection(db, "debts"),
+  // ✏️ UPDATE DEBT
+  if (editingDebt) {
+    await firestoreFunctions.updateDoc(
+      firestoreFunctions.doc(db, "debts", editingDebt.id),
       {
         ...debtForm,
-        amount: Number(debtForm.amount),
-        status: "Unlinked",
-        createdAt: new Date().toISOString()
+        amount: cleanAmount,
+        updatedAt: new Date().toISOString()
       }
     );
 
-    setDebts(prev => [
-      {
-        id: docRef.id,
-        ...debtForm,
-        amount: Number(debtForm.amount),
-        status: "Unlinked"
-      },
-      ...prev
-    ]);
+    // 🔄 UPDATE DEBT STATE
+    setDebts(prev =>
+      prev.map(d =>
+        d.id === editingDebt.id
+          ? { ...d, amount: cleanAmount }
+          : d
+      )
+    );
 
-    showToast("➕ Debt added successfully");
+    // 🔄 UPDATE ALL LINKED FARMERS
+    setFarmers(prev =>
+      prev.map(f =>
+        f.debtId === editingDebt.id
+          ? { ...f, pendingAmount: cleanAmount }
+          : f
+      )
+    );
+
+    // 🔄 UPDATE ALL LINKED DEALERS
+    setDealers(prev =>
+      prev.map(d =>
+        d.debtId === editingDebt.id
+          ? { ...d, pendingAmount: cleanAmount }
+          : d
+      )
+    );
+
+    showToast("✅ Debt updated");
     resetDebtForm();
-
-  } catch (err) {
-    console.error(err);
-    showToast("❌ Failed to save debt", "error");
+    return;
   }
+
+  // ➕ ADD DEBT
+  const docRef = await firestoreFunctions.addDoc(
+    firestoreFunctions.collection(db, "debts"),
+    {
+      ...debtForm,
+      amount: cleanAmount,
+      createdAt: new Date().toISOString()
+    }
+  );
+
+  setDebts(prev => [
+    { id: docRef.id, ...debtForm, amount: cleanAmount },
+    ...prev
+  ]);
+
+  showToast("➕ Debt added");
+  resetDebtForm();
 };
 
 
 
 
+
   const handleSubmit = async () => {
-    if (!formData.name || !formData.address) {
-      alert("⚠️ Please fill Name and Address");
-      return;
-    }
+  if (!formData.name || !formData.address) {
+    alert("⚠️ Please fill Name and Address");
+    return;
+  }
 
-    // =========================
-    // ✏️ EDIT EXISTING RECORD
-    // =========================
-    if (editingRecord) {
-      const type = activeTab === "farmers" ? "farmer" : "dealer";
-      await updateInFirebase(type, editingRecord.id, formData);
-      return;
-    }
+  const recordType = activeTab === "farmers" ? "Farmer" : "Dealer";
 
-    // =========================
-    // ➕ ADD NEW RECORD
-    // =========================
-    const recordType = activeTab === "farmers" ? "Farmer" : "Dealer";
-
-    let updatedFormData = { ...formData };
-
-    // 🔍 FIND MATCHING DEBT BY ADDRESS
-    const matchedDebt = debts.find(d =>
-      d.type === recordType &&
-      d.status === "Unlinked" &&
-      d.address.trim().toLowerCase() ===
-      formData.address.trim().toLowerCase()
-    );
-
-    // =========================
-    // 💰 AUTO APPLY DEBT
-    // =========================
-    if (matchedDebt) {
-      updatedFormData.pendingAmount = matchedDebt.amount;
-
-      try {
-        // 🔗 Mark debt as linked in Firebase
-        await firestoreFunctions.updateDoc(
-          firestoreFunctions.doc(db, "debts", matchedDebt.id),
-          {
-            status: "Linked",
-            linkedAt: new Date().toISOString()
-          }
-        );
-
-        // 🔄 Update local debt state
-        setDebts(debts.map(d =>
-          d.id === matchedDebt.id
-            ? { ...d, status: "Linked" }
-            : d
-        ));
-      } catch (err) {
-        console.error("Debt linking failed", err);
-        alert("❌ Failed to link debt");
-        return;
-      }
-    }
-
-    // =========================
-    // 💾 SAVE FARMER / DEALER
-    // =========================
-    if (activeTab === "farmers") {
-      await saveToFirebase("farmer", updatedFormData);
-    } else {
-      await saveToFirebase("dealer", updatedFormData);
-    }
+  let updatedFormData = {
+    ...formData,
+    pendingAmount: toNumber(formData.pendingAmount)
   };
+
+  // 🔍 FIND MATCHING DEBT (NO STATUS CHECK)
+ const matchedDebt = debts.find(d =>
+  d.type === recordType &&
+  d.address.trim().toLowerCase() ===
+  formData.address.trim().toLowerCase()
+);
+
+
+  // 🔗 LINK DEBT (ALLOW MULTIPLE FARMERS)
+  if (matchedDebt) {
+    updatedFormData.pendingAmount = toNumber(matchedDebt.amount);
+    updatedFormData.debtId = matchedDebt.id; // 🔑 IMPORTANT LINK
+  }
+
+  // ✏️ EDIT
+  if (editingRecord) {
+    const type = activeTab === "farmers" ? "farmer" : "dealer";
+    await updateInFirebase(type, editingRecord.id, updatedFormData);
+    return;
+  }
+
+  // ➕ ADD
+  if (activeTab === "farmers") {
+    await saveToFirebase("farmer", updatedFormData);
+  } else {
+    await saveToFirebase("dealer", updatedFormData);
+  }
+};
+
 
   const clean = (str) => {
     if (!str) return "";
