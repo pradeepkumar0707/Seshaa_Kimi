@@ -40,6 +40,10 @@ const KeerthanaTraders = () => {
   const [debtSearch, setDebtSearch] = useState("");
   const [debtSearchDate, setDebtSearchDate] = useState("");
   const [viewDebt, setViewDebt] = useState(null);
+  const [showDebtStatement, setShowDebtStatement] = useState(false);
+
+  
+
 
 
   const [debtForm, setDebtForm] = useState({
@@ -50,7 +54,10 @@ const KeerthanaTraders = () => {
     date: new Date().toISOString().split("T")[0], // ✅ ADD
     notes: ""
   });
-
+const toNumber = (v) => {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+};
   const filteredDebts = debts
     .filter(d => debtTypeFilter === "All" || d.type === debtTypeFilter)
     .filter(d =>
@@ -59,6 +66,12 @@ const KeerthanaTraders = () => {
     )
     .filter(d => debtSearchDate ? d.date === debtSearchDate : true)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    const totalDebtAmount = filteredDebts.reduce(
+  (sum, d) => sum + toNumber(d.amount),
+  0
+);
+
 
   const handleDebtChange = (e) => {
     const { name, value } = e.target;
@@ -91,10 +104,7 @@ const KeerthanaTraders = () => {
   const [searchDate, setSearchDate] = useState('');
   const [statementType, setStatementType] = useState("All");
 
-  const toNumber = (v) => {
-  const n = Number(v);
-  return isNaN(n) ? 0 : n;
-};
+  
 
 
 
@@ -1244,9 +1254,19 @@ ${text}
         {activeTab === "debts" && (
           <div className="bg-white p-6 rounded-xl shadow space-y-6">
 
-            <h2 className="text-2xl font-bold text-orange-600">
-              💰 நிலுவை தொகை
-            </h2>
+          <div className="flex justify-between items-center">
+  <h2 className="text-2xl font-bold text-orange-600">
+    💰 நிலுவை தொகை
+  </h2>
+
+  <button
+    onClick={() => setShowDebtStatement(true)}
+    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+  >
+    📄 Debt Statement
+  </button>
+</div>
+
 
             {/* ➕ ADD / EDIT DEBT FORM */}
             <form
@@ -1484,6 +1504,8 @@ ${text}
                     ))}
                   </select>
                 )}
+
+                
 
                 {/* Date Input */}
                 <input
@@ -1777,6 +1799,59 @@ ${text}
               )}
           </div>
         )}
+        {showDebtStatement && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-xl p-6 w-full max-w-4xl shadow-xl">
+
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-xl font-bold text-blue-600">
+          📄 Debt Statement
+        </h3>
+        <button
+          onClick={() => setShowDebtStatement(false)}
+          className="text-red-600 font-bold text-lg"
+        >
+          ✖
+        </button>
+      </div>
+
+      {/* TABLE */}
+      <div className="overflow-auto border rounded">
+        <table className="w-full border-collapse">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="border p-2">Date</th>
+              <th className="border p-2">Name</th>
+              <th className="border p-2">Address</th>
+              <th className="border p-2">Type</th>
+              <th className="border p-2 text-right">Amount (₹)</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filteredDebts.map((d, i) => (
+              <tr key={i}>
+                <td className="border p-2">{d.date}</td>
+                <td className="border p-2">{d.name}</td>
+                <td className="border p-2">{d.address}</td>
+                <td className="border p-2">{d.type}</td>
+                <td className="border p-2 text-right font-semibold text-red-600">
+                  ₹ {toNumber(d.amount)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* TOTAL */}
+      <div className="mt-4 text-right text-lg font-bold text-green-700">
+        Total Debt Amount: ₹ {totalDebtAmount}
+      </div>
+    </div>
+  </div>
+)}
+
       </main>
     </div>
   );
