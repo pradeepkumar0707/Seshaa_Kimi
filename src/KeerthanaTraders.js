@@ -1799,43 +1799,43 @@ ${text}
               )}
           </div>
         )}
-        {showDebtStatement && (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div className="bg-white rounded-xl p-6 w-full max-w-4xl shadow-xl">
+    {showDebtStatement && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-xl p-6 w-full max-w-4xl shadow-xl flex flex-col max-h-[85vh]">
 
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-bold text-blue-600">
+      <div className="flex justify-between items-center mb-4 flex-shrink-0">
+        <h3 className="text-2xl font-bold text-blue-600">
           📄 Debt Statement
         </h3>
         <button
           onClick={() => setShowDebtStatement(false)}
-          className="text-red-600 font-bold text-lg"
+          className="text-red-600 font-bold text-2xl hover:text-red-800"
         >
           ✖
         </button>
       </div>
 
-      {/* TABLE */}
-      <div className="overflow-auto border rounded">
-        <table className="w-full border-collapse">
-          <thead className="bg-gray-100">
+      {/* TABLE - Scrollable */}
+      <div className="overflow-auto border-2 rounded-lg flex-1 mb-4">
+        <table className="w-full border-collapse text-base">
+          <thead className="bg-gray-100 sticky top-0">
             <tr>
-              <th className="border p-2">Date</th>
-              <th className="border p-2">Name</th>
-              <th className="border p-2">Address</th>
-              <th className="border p-2">Type</th>
-              <th className="border p-2 text-right">Amount (₹)</th>
+              <th className="border p-3 font-bold text-base">Date</th>
+              <th className="border p-3 font-bold text-base">Name</th>
+              <th className="border p-3 font-bold text-base">Address</th>
+              <th className="border p-3 font-bold text-base">Type</th>
+              <th className="border p-3 text-right font-bold text-base">Amount (₹)</th>
             </tr>
           </thead>
 
           <tbody>
             {filteredDebts.map((d, i) => (
-              <tr key={i}>
-                <td className="border p-2">{d.date}</td>
-                <td className="border p-2">{d.name}</td>
-                <td className="border p-2">{d.address}</td>
-                <td className="border p-2">{d.type}</td>
-                <td className="border p-2 text-right font-semibold text-red-600">
+              <tr key={i} className="hover:bg-gray-50">
+                <td className="border p-3 font-semibold">{d.date}</td>
+                <td className="border p-3 font-semibold">{d.name}</td>
+                <td className="border p-3 font-semibold">{d.address}</td>
+                <td className="border p-3 font-semibold">{d.type}</td>
+                <td className="border p-3 text-right font-bold text-red-600 text-base">
                   ₹ {toNumber(d.amount)}
                 </td>
               </tr>
@@ -1844,8 +1844,8 @@ ${text}
         </table>
       </div>
 
-      {/* TOTAL */}
-      <div className="mt-4 text-right text-lg font-bold text-green-700">
+      {/* TOTAL - Fixed at bottom */}
+      <div className="text-right text-xl font-bold text-green-700 flex-shrink-0 border-t-2 pt-4">
         Total Debt Amount: ₹ {totalDebtAmount}
       </div>
     </div>
