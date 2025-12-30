@@ -54,9 +54,15 @@ const KeerthanaTraders = () => {
     notes: ""
   });
  const toNumber = (v) => {
-  if (v === null || v === undefined || v === "") return 0;
-  return Number(unformatNumber(v));
+  if (v == null || v === "") return 0;
+
+  const cleaned = String(v).replace(/,/g, "");
+  const n = Number(cleaned);
+
+  return Number.isFinite(n) ? n : 0;
 };
+
+
 
   const filteredDebts = debts
     .filter(d => debtTypeFilter === "All" || d.type === debtTypeFilter)
