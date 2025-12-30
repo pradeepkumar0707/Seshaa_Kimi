@@ -894,7 +894,7 @@ const unformatNumber = (value) =>
           : `<b>ஒரு குவிண்டால் விலை : ${priceText}\n</b>`
       ) : ""}
     ${makeLine("மொத்த தொகை", "₹ " + formatIndianNumber(record.totalAmount))}
-${makeLine("நிலுவை தொகை", "₹ " + formatIndianNumber(record.pendingAmount))}
+    ${makeLine("நிலுவை தொகை", "₹ " + formatIndianNumber(record.pendingAmount))}
 
     ${makeLine("Status", record.status)}
     ${record.company ? makeLine("Company", record.company) : ""}
