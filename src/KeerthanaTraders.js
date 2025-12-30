@@ -847,11 +847,11 @@ const unformatNumber = (value) =>
   const printRecord = (record) => {
 
     const header = `<b>         
-    கீர்த்தனா டிரேடர்ஸ்   
-    1-6A, Police Station Road, 
-    Pudur - 628905     
-    📞 9442355882 , 8778367316 
-    ------------------------------------------------
+  கீர்த்தனா டிரேடர்ஸ்   
+  1-6A, Police Station Road, 
+  Pudur - 628905     
+  📞 9442355882 , 8778367316 
+  ------------------------------------------------
   </b>`;
 
     const getWidth = (text) => {
@@ -901,26 +901,26 @@ const unformatNumber = (value) =>
     const thingsLine = formatThingsLine(record.things);
 
     const text = `${header}
-    ${makeLine("பெயர்", record.name)}
-    ${makeLine("முகவரி", record.address)}
-    ${makeLine("தேதி", formatIndianDate(record.date))}
-    ${thingsLine}
-    ${record.numberOfBags ? makeLine("பை எண்ணிக்கை", record.numberOfBags) : ""}
-    ${makeLine("எடை", record.kilos || "-")}
-    ${record.pricePerKilo ? (
+ ${makeLine("பெயர்", record.name)}
+ ${makeLine("முகவரி", record.address)}
+ ${makeLine("தேதி", formatIndianDate(record.date))}
+ ${thingsLine}
+ ${record.numberOfBags ? makeLine("பை எண்ணிக்கை", record.numberOfBags) : ""}
+ ${makeLine("எடை", record.kilos || "-")}
+ ${record.pricePerKilo ? (
         priceText.includes(",")
           ? `<b>ஒரு குவிண்டால் விலை :\n    ${priceText.replace(/,/g, ",\n    ")}\n</b>`
           : `<b>ஒரு குவிண்டால் விலை : ${priceText}\n</b>`
       ) : ""}
-    ${makeLine("மொத்த தொகை", "₹ " + formatIndianNumber(record.totalAmount))}
-    ${makeLine("நிலுவை தொகை", "₹ " + formatIndianNumber(record.pendingAmount))}
+ ${makeLine("மொத்த தொகை", "₹ " + formatIndianNumber(record.totalAmount))}
+ ${makeLine("நிலுவை தொகை", "₹ " + formatIndianNumber(record.pendingAmount))}
 
-    ${makeLine("Status", record.status)}
-    ${record.company ? makeLine("Company", record.company) : ""}
-    ${record.brokerName ? makeLine("தரகர் பெயர்", record.brokerName) : ""}
-    ${record.weighbridgeName ? makeLine("Weighbridge Name", record.weighbridgeName) : ""}
-    ${record.notes ? makeLine("Notes", record.notes) : ""}
-    ------------------------------------------------
+ ${makeLine("Status", record.status)}
+ ${record.company ? makeLine("Company", record.company) : ""}
+ ${record.brokerName ? makeLine("தரகர் பெயர்", record.brokerName) : ""}
+ ${record.weighbridgeName ? makeLine("Weighbridge Name", record.weighbridgeName) : ""}
+ ${record.notes ? makeLine("Notes", record.notes) : ""}
+  ------------------------------------------------
     <b> நன்றி! மீண்டும் வருக </b>
   `;
 
