@@ -198,13 +198,26 @@ const KeerthanaTraders = () => {
   };
 
   const formatIndianNumber = (value) => {
-  if (!value) return "";
-  const clean = value.toString().replace(/,/g, "");
-  return clean.replace(/\B(?=(\d{2})+(?!\d))/g, ",");
-};
+    if (value === null || value === undefined || value === "") return "0";
 
-const unformatNumber = (value) =>
-  value ? value.toString().replace(/,/g, "") : "";
+    const num = value.toString().replace(/,/g, "");
+    const lastThree = num.slice(-3);
+    const otherNumbers = num.slice(0, -3);
+
+    if (otherNumbers !== "") {
+      return (
+        otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") +
+        "," +
+        lastThree
+      );
+    }
+
+    return lastThree;
+  };
+
+
+  const unformatNumber = (value) =>
+    value ? value.toString().replace(/,/g, "") : "";
 
 
 
@@ -1325,19 +1338,19 @@ ${text}
                 <option value="Dealer">Dealer</option>
               </select>
 
-             <input
-  type="text"
-  name="amount"
-  value={formatIndianNumber(debtForm.amount)}
-  onChange={(e) => {
-    const raw = unformatNumber(e.target.value);
-    if (/^\d*$/.test(raw)) {
-      setDebtForm({ ...debtForm, amount: raw });
-    }
-  }}
-  placeholder="தொகை"
-  className="border p-2 rounded"
-/>
+              <input
+                type="text"
+                name="amount"
+                value={formatIndianNumber(debtForm.amount)}
+                onChange={(e) => {
+                  const raw = unformatNumber(e.target.value);
+                  if (/^\d*$/.test(raw)) {
+                    setDebtForm({ ...debtForm, amount: raw });
+                  }
+                }}
+                placeholder="தொகை"
+                className="border p-2 rounded"
+              />
 
               <input
                 name="brokerName"
@@ -1693,33 +1706,33 @@ ${text}
                     onChange={(e) => setFormData({ ...formData, pricePerKilo: e.target.value })}
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
                   />
-                 <input
-  type="text"
-  name="totalAmount"
-  value={formatIndianNumber(formData.totalAmount)}
-  onChange={(e) => {
-    const raw = unformatNumber(e.target.value);
-    if (/^\d*$/.test(raw)) {
-      setFormData({ ...formData, totalAmount: raw });
-    }
-  }}
-  placeholder="மொத்த தொகை"
-  className="border p-2 rounded"
-/>
+                  <input
+                    type="text"
+                    name="totalAmount"
+                    value={formatIndianNumber(formData.totalAmount)}
+                    onChange={(e) => {
+                      const raw = unformatNumber(e.target.value);
+                      if (/^\d*$/.test(raw)) {
+                        setFormData({ ...formData, totalAmount: raw });
+                      }
+                    }}
+                    placeholder="மொத்த தொகை"
+                    className="border p-2 rounded"
+                  />
 
-                 <input
-  type="text"
-  name="pendingAmount"
-  value={formatIndianNumber(formData.pendingAmount)}
-  onChange={(e) => {
-    const raw = unformatNumber(e.target.value);
-    if (/^\d*$/.test(raw)) {
-      setFormData({ ...formData, pendingAmount: raw });
-    }
-  }}
-  placeholder="நிலுவை தொகை"
-  className="border p-2 rounded"
-/>
+                  <input
+                    type="text"
+                    name="pendingAmount"
+                    value={formatIndianNumber(formData.pendingAmount)}
+                    onChange={(e) => {
+                      const raw = unformatNumber(e.target.value);
+                      if (/^\d*$/.test(raw)) {
+                        setFormData({ ...formData, pendingAmount: raw });
+                      }
+                    }}
+                    placeholder="நிலுவை தொகை"
+                    className="border p-2 rounded"
+                  />
 
                   <input
                     type="text"
