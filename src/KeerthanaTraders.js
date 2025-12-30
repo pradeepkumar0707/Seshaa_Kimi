@@ -53,10 +53,11 @@ const KeerthanaTraders = () => {
     date: new Date().toISOString().split("T")[0], // ✅ ADD
     notes: ""
   });
-  const toNumber = (v) => {
-    const n = Number(v);
-    return isNaN(n) ? 0 : n;
-  };
+ const toNumber = (v) => {
+  if (v === null || v === undefined || v === "") return 0;
+  return Number(unformatNumber(v));
+};
+
   const filteredDebts = debts
     .filter(d => debtTypeFilter === "All" || d.type === debtTypeFilter)
     .filter(d =>
