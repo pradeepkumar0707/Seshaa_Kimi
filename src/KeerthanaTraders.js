@@ -741,7 +741,7 @@ const unformatNumber = (value) =>
       address: debt.address,
       type: debt.type,
       brokerName: debt.brokerName || "",   // ✅
-      amount: debt.amount,
+      amount: String(debt.amount),
       date: debt.date,
       notes: debt.notes || ""
     });
@@ -1337,7 +1337,7 @@ ${text}
                 <option value="Dealer">Dealer</option>
               </select>
 
-              <input
+             <input
   type="text"
   name="amount"
   value={debtForm.amount}
@@ -1362,6 +1362,7 @@ ${text}
   placeholder="தொகை"
   className="border p-2 rounded"
 />
+
 
 
 
