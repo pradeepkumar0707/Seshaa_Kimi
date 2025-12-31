@@ -72,7 +72,12 @@ const KeerthanaTraders = () => {
     )
     .filter(d => debtSearchDate ? d.date === debtSearchDate : true)
     .filter(d => debtBrokerFilter ? d.brokerName === debtBrokerFilter : true) // ✅ ADDED
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+   .sort((a, b) =>
+  (b.timestamp || 0) - (a.timestamp || 0) ||
+  new Date(b.date) - new Date(a.date)
+);
+
+
 
   const totalDebtAmount = filteredDebts.reduce(
     (sum, d) => sum + toNumber(d.amount),
@@ -503,13 +508,21 @@ const unformatNumber = (value) =>
         }
       );
 
-      const newRecord = { ...data, id: docRef.id };
+    const now = Date.now();
 
-      if (type === 'farmer') {
-        setFarmers([...farmers, newRecord]);
-      } else {
-        setDealers([...dealers, newRecord]);
-      }
+const newRecord = {
+  ...data,
+  id: docRef.id,
+  createdAt: new Date().toISOString(),
+  timestamp: now
+};
+
+if (type === 'farmer') {
+  setFarmers(prev => [newRecord, ...prev]); // ✅ latest first
+} else {
+  setDealers(prev => [newRecord, ...prev]); // ✅ latest first
+}
+
 
       alert('✅ Record saved successfully!');
       resetForm();
@@ -947,7 +960,11 @@ ${text}
 
       return matchesText && matchesDate && matchesBroker;
     })
-    .sort((a, b) => new Date(b.date) - new Date(a.date));   // <-- LATEST FIRST
+   .sort((a, b) =>
+  (b.timestamp || 0) - (a.timestamp || 0) ||
+  new Date(b.date) - new Date(a.date)
+);
+
 
 
   const filteredDealers = dealers
@@ -962,7 +979,11 @@ ${text}
 
       return matchesText && matchesDate && matchesBroker;
     })
-    .sort((a, b) => new Date(b.date) - new Date(a.date));   // <-- LATEST FIRST
+    .sort((a, b) =>
+  (b.timestamp || 0) - (a.timestamp || 0) ||
+  new Date(b.date) - new Date(a.date)
+);
+
 
 
   // Login Screen
