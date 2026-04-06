@@ -42,7 +42,225 @@ const KeerthanaTraders = () => {
   const [viewDebt, setViewDebt] = useState(null);
   const [showDebtStatement, setShowDebtStatement] = useState(false);
   const [debtBrokerFilter, setDebtBrokerFilter] = useState("");
+    const [purchase, setPurchase] = useState({
+  date: new Date().toISOString().split("T")[0],
+  thing: "",
+  tons: "",
+  ratePerKg: "",
+  entries: "",  
+  splits: [],
+  totalKg: 0,
+  totalAmount: 0
+});
 
+const randomNames = [
+  // 👨 Men
+  "அருண்","கார்த்திக்","விஜய்","அஜித்","சூர்யா","தினேஷ","முருகன்","செந்தில்","கணேஷ்","குமரன்",
+  "பாலா","சிவா","மணிகண்டன்","ரவி","சரவணன்","ராஜேஷ்","பிரகாஷ்","வெங்கடேஷ்","மோகன்","நவீன்",
+  "அன்பு","ஆதித்யன்","மகேஷ்","யுவராஜ்","ராம்குமார்","ஜெயக்குமார்","சந்தோஷ்","கோபி","மாதவன்","கதிர்",
+  "அசோக்","சுரேஷ்","பாஸ்கர்","இளங்கோ","கிருஷ்ணன்","ரமேஷ்","செல்வம்","தாமோதரன்","பாண்டியன்","வினோத்",
+
+  // 👩 Women
+  "காவ்யா","பிரியா","சுமித்ரா","ராதிகா","மாலதி","லட்சுமி","சரண்யா","விஜயலட்சுமி","மீனா","கவிதா",
+  "அஞ்சலி","பவித்ரா","கலைவாணி","ஜெயந்தி","மஞ்சுளா","ரேவதி","அமுதா","சுதா","நந்தினி","சித்ரா",
+  "மகேஸ்வரி","பூங்கொடி","தீபிகா","அபிநயா","ஷர்மிளா","மோகனா","வாணி","பூஜா","இந்துமதி","கோகிலா",
+  "சாந்தி","உஷா","மல்லிகா","கீர்த்தனா","சந்தியா","துர்கா","பார்வதி","தேவி","மீனாட்சி","ராஜலட்சுமி",
+
+  // 🧑‍🤝‍🧑 Gender-neutral / common Tamil
+  "அரசி","செல்வி","மணி","மதி","இனியன்","தென்றல்","பொன்மொழி","தமிழ்","வளவன்","அன்பழகன்",
+  "அழகன்","அழகி","நிலா","மழை","கனி","முத்து","முத்தழகி","முத்துக்குமார்","பொன்னி","வெண்ணிலா",
+  "மல்லி","பூவி","குயில்","தாமரை","வானதி","மருதன்","மருதமுத்து","குரல்","இளவேந்தன்","இளமதி",
+
+  // ➕ Extra to reach 200+
+  "அகிலன்","ஆர்த்தி","கீர்த்தி","சுபாஷ்","மோகினி","சஞ்சய்","லலிதா","ஹரிணி","தேன்மொழி","பிரியதர்ஷினி",
+  "ரகுநாத்","பிரேமா","வசந்தி","கார்த்திகா","நிஷாந்த்","ரேணுகா","அரவிந்த்","மித்ரா","ஜோதி","நரேஷ்",
+  "கௌரி","விஷால்","பவானி","சக்தி","சக்திவேல்","சதீஷ்","பானுமதி","சுந்தர்","ராதா","கிருபா",
+  "ஆதிரா","துளசி","மயில்விழி","சூர்யகாந்தி","பூங்கவி","இளஞ்செழியன்","வசந்த்","காயத்ரி","அமலா","ஹேமா"
+];
+const purchaseNames = [
+  // 👨 Men
+  "அருண்","கார்த்திக்","விஜய்","அஜித்","சூர்யா","தினேஷ","முருகன்","செந்தில்","கணேஷ்","குமரன்",
+  "பாலா","சிவா","மணிகண்டன்","ரவி","சரவணன்","ராஜேஷ்","பிரகாஷ்","வெங்கடேஷ்","மோகன்","நவீன்",
+  "அன்பு","ஆதித்யன்","மகேஷ்","யுவராஜ்","ராம்குமார்","ஜெயக்குமார்","சந்தோஷ்","கோபி","மாதவன்","கதிர்",
+  "அசோக்","சுரேஷ்","பாஸ்கர்","இளங்கோ","கிருஷ்ணன்","ரமேஷ்","செல்வம்","தாமோதரன்","பாண்டியன்","வினோத்",
+
+  // 👩 Women
+  "காவ்யா","பிரியா","சுமித்ரா","ராதிகா","மாலதி","லட்சுமி","சரண்யா","விஜயலட்சுமி","மீனா","கவிதா",
+  "அஞ்சலி","பவித்ரா","கலைவாணி","ஜெயந்தி","மஞ்சுளா","ரேவதி","அமுதா","சுதா","நந்தினி","சித்ரா",
+  "மகேஸ்வரி","பூங்கொடி","தீபிகா","அபிநயா","ஷர்மிளா","மோகனா","வாணி","பூஜா","இந்துமதி","கோகிலா",
+  "சாந்தி","உஷா","மல்லிகா","கீர்த்தனா","சந்தியா","துர்கா","பார்வதி","தேவி","மீனாட்சி","ராஜலட்சுமி",
+
+  // 🧑‍🤝‍🧑 Gender-neutral / common Tamil
+  "அரசி","செல்வி","மணி","மதி","இனியன்","தென்றல்","பொன்மொழி","தமிழ்","வளவன்","அன்பழகன்",
+  "அழகன்","அழகி","நிலா","மழை","கனி","முத்து","முத்தழகி","முத்துக்குமார்","பொன்னி","வெண்ணிலா",
+  "மல்லி","பூவி","குயில்","தாமரை","வானதி","மருதன்","மருதமுத்து","குரல்","இளவேந்தன்","இளமதி",
+
+  // ➕ Extra to reach 200+
+  "அகிலன்","ஆர்த்தி","கீர்த்தி","சுபாஷ்","மோகினி","சஞ்சய்","லலிதா","ஹரிணி","தேன்மொழி","பிரியதர்ஷினி",
+  "ரகுநாத்","பிரேமா","வசந்தி","கார்த்திகா","நிஷாந்த்","ரேணுகா","அரவிந்த்","மித்ரா","ஜோதி","நரேஷ்",
+  "கௌரி","விஷால்","பவானி","சக்தி","சக்திவேல்","சதீஷ்","பானுமதி","சுந்தர்","ராதா","கிருபா",
+  "ஆதிரா","துளசி","மயில்விழி","சூர்யகாந்தி","பூங்கவி","இளஞ்செழியன்","வசந்த்","காயத்ரி","அமலா","ஹேமா"
+];
+const resetPurchase = () => {
+  setFromDate("");
+  setToDate("");
+
+  setPurchase({
+    date: new Date().toISOString().split("T")[0],
+    thing: "",
+    tons: "",
+    ratePerKg: "",
+    entries: "",
+    splits: [],
+    totalKg: 0,
+    totalAmount: 0
+  });
+};
+
+const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
+  const MIN_KG = 10;
+
+  // ✅ SAFE DATE HANDLING
+  const start = fromDate ? new Date(fromDate) : new Date();
+  if (isNaN(start)) return [];
+
+  const end =
+    toDate && !isNaN(new Date(toDate)) ? new Date(toDate) : start;
+
+  const days =
+    Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+  if (count * MIN_KG > totalKg) return [];
+
+  let remainingKg = totalKg - count * MIN_KG;
+
+  const shuffled = [...randomNames].sort(() => Math.random() - 0.5);
+
+  let result = [];
+
+  for (let i = 0; i < count; i++) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + (i % days));
+
+    result.push({
+      date: date.toISOString().split("T")[0], // ✅ SAFE NOW
+      name: shuffled[i] || `Name ${i + 1}`,
+      weightKg: MIN_KG,
+      amount: MIN_KG * rate
+    });
+  }
+
+  while (remainingKg > 0) {
+    const index = Math.floor(Math.random() * count);
+    result[index].weightKg += 1;
+    result[index].amount += rate;
+    remainingKg -= 1;
+  }
+
+ return result
+  .sort((a, b) => new Date(a.date) - new Date(b.date)) // ✅ ASCENDING DATE
+  .map(r => ({
+    ...r,
+    displayWeight: (r.weightKg / 100).toFixed(2)
+  }));
+
+};
+const savePurchase = async () => {
+  if (!db || !firestoreFunctions) {
+    alert("Firebase not connected");
+    return;
+  }
+
+  if (!purchase.tons || !purchase.ratePerKg || !purchase.entries) {
+    alert("Please fill all required fields");
+    return;
+  }
+
+  try {
+    await firestoreFunctions.addDoc(
+      firestoreFunctions.collection(db, "purchases"),
+      {
+        ...purchase,
+        fromDate,
+        toDate: toDate || fromDate,
+        createdAt: new Date().toISOString(),
+        timestamp: Date.now()
+      }
+    );
+
+    alert("✅ Purchase saved successfully");
+    resetPurchase();
+  } catch (err) {
+    console.error(err);
+    alert("❌ Failed to save purchase");
+  }
+};
+
+
+const splitWeight = (totalKg, rate) => {
+  let remaining = totalKg;
+  let result = [];
+  let used = [];
+
+  while (remaining > 0) {
+    const name = purchaseNames.find(n => !used.includes(n));
+    used.push(name);
+
+    const weight =
+      remaining > 5000
+        ? Math.floor(Math.random() * 4000) + 1000
+        : remaining;
+
+    result.push({
+      name,
+      weight,
+      amount: weight * rate
+    });
+
+    remaining -= weight;
+  }
+
+  return result;
+};
+useEffect(() => {
+  const tons = Number(purchase.tons);
+  const rate = Number(purchase.ratePerKg);
+  const entries = Number(purchase.entries);
+
+  if (!fromDate || tons <= 0 || rate <= 0 || entries <= 0) {
+    setPurchase(prev => ({
+      ...prev,
+      splits: [],
+      totalAmount: 0
+    }));
+    return;
+  }
+
+  const totalKg = tons * 1000;
+
+  const splits = splitPurchase(
+    totalKg,
+    rate,
+    entries,
+    fromDate,
+    toDate
+  );
+
+  const totalAmount = splits.reduce((sum, i) => sum + i.amount, 0);
+
+  setPurchase(prev => ({
+    ...prev,
+    totalKg,
+    splits,
+    totalAmount
+  }));
+}, [
+  purchase.tons,
+  purchase.ratePerKg,
+  purchase.entries,
+  fromDate,
+  toDate
+]);
 
 
   const [debtForm, setDebtForm] = useState({
@@ -147,6 +365,10 @@ const KeerthanaTraders = () => {
       if (statusFilter === "Completed") return status === "Completed";
       return status !== "Completed";
     };
+
+  
+
+
 
     const mapRow = (r, type) => ({
       Date: r.date,
@@ -1172,7 +1394,10 @@ ${text}
               { id: 'home', label: 'Home', icon: Home },
               { id: 'farmers', label: 'Farmer', icon: Users },
               { id: 'dealers', label: 'Dealer', icon: Store },
-              { id: "debts", label: "Debts", icon: FileText }
+              { id: "debts", label: "Debts", icon: FileText },
+              { id: 'purchase', label: 'கொள்முதல்', icon: FileText }
+
+
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1940,6 +2165,122 @@ ${text}
               )}
           </div>
         )}
+      {activeTab === "purchase" && (
+  <div className="bg-white p-6 rounded shadow space-y-4">
+
+    {/* Dates */}
+    <div className="flex gap-4">
+      <input
+        type="date"
+        value={fromDate}
+        onChange={e => setFromDate(e.target.value)}
+        className="border px-3 py-2 rounded"
+      />
+
+      <input
+        type="date"
+        value={toDate}
+        onChange={e => setToDate(e.target.value)}
+        className="border px-3 py-2 rounded"
+      />
+    </div>
+
+    {/* Entries */}
+    <input
+      type="number"
+      placeholder="Number of Entries"
+      value={purchase.entries}
+      onChange={e =>
+        setPurchase({ ...purchase, entries: e.target.value })
+      }
+      className="border px-3 py-2 rounded w-full"
+    />
+
+    {/* Item */}
+    <input
+      placeholder="பொருள்"
+      value={purchase.thing}
+      onChange={e => setPurchase({ ...purchase, thing: e.target.value })}
+      className="border px-3 py-2 rounded w-full"
+    />
+
+    {/* Tons */}
+    <input
+      type="number"
+      placeholder="Tons"
+      value={purchase.tons}
+      onChange={e => setPurchase({ ...purchase, tons: e.target.value })}
+      className="border px-3 py-2 rounded w-full"
+    />
+
+    {/* Rate */}
+    <input
+      type="number"
+      placeholder="Rate per Kg"
+      value={purchase.ratePerKg}
+      onChange={e =>
+        setPurchase({ ...purchase, ratePerKg: e.target.value })
+      }
+      className="border px-3 py-2 rounded w-full"
+    />
+
+    {/* ===== TOTALS + ACTION BUTTONS ===== */}
+    <div className="flex items-center justify-between border-t pt-4 mt-4">
+      <div>
+        <p className="font-bold">
+          Total Tons: {(purchase.totalKg / 1000).toFixed(2)}
+        </p>
+        <p className="font-bold text-green-600">
+          Total Amount: ₹ {purchase.totalAmount}
+        </p>
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={savePurchase}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          💾 Save Purchase
+        </button>
+
+        <button
+          onClick={resetPurchase}
+          className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+        >
+          🔄 Reset
+        </button>
+      </div>
+    </div>
+
+    {/* ===== SPLIT TABLE ===== */}
+    {purchase.splits.length > 0 && (
+      <table className="w-full border mt-4">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="text-left p-2 border">Date</th>
+            <th className="text-left p-2 border">Name</th>
+            <th className="text-right p-2 border">Weight</th>
+            <th className="text-right p-2 border">Amount</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {purchase.splits.map((r, i) => (
+            <tr key={i}>
+              <td className="border p-2">{r.date}</td>
+              <td className="border p-2">{r.name}</td>
+              <td className="border p-2 text-right">{r.displayWeight}</td>
+              <td className="border p-2 text-right">₹ {r.amount}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+
+  </div>
+)}
+
+
         {showDebtStatement && (
           <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl p-6 w-full max-w-4xl shadow-xl flex flex-col max-h-[85vh]">
