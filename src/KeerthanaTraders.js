@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Home, Users, Store, Search, Plus, Trash2, FileText, Loader, AlertCircle, RefreshCw, Edit, X, Lock } from 'lucide-react';
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBpXvNm_ZK3-D1BMtHuIxl3A8P8BmX1bbw",
   authDomain: "pradeepcheck-2c7a5.firebaseapp.com",
@@ -42,17 +45,70 @@ const KeerthanaTraders = () => {
   const [viewDebt, setViewDebt] = useState(null);
   const [showDebtStatement, setShowDebtStatement] = useState(false);
   const [debtBrokerFilter, setDebtBrokerFilter] = useState("");
+  const [showOthersPurchase, setShowOthersPurchase] = useState(false);
+const [customPurchaseThing, setCustomPurchaseThing] = useState("");
     const [purchase, setPurchase] = useState({
   date: new Date().toISOString().split("T")[0],
   thing: "",
-  tons: "",
+ kilos: "",
   ratePerKg: "",
   entries: "",  
   splits: [],
   totalKg: 0,
   totalAmount: 0
 });
+const downloadPurchasePDF = async (purchaseId) => {
+  const elementId = purchaseId ? `purchase-${purchaseId}` : "purchase-pdf";
+  const element = document.getElementById(elementId);
 
+  if (!element) {
+    alert("No data to download");
+    return;
+  }
+
+  // ✅ Hide all buttons inside the element before capture
+  const buttons = element.querySelectorAll("button");
+  buttons.forEach(btn => (btn.style.display = "none"));
+
+  const originalHeight = element.style.height;
+  const originalOverflow = element.style.overflow;
+  element.style.height = "auto";
+  element.style.overflow = "visible";
+
+  const canvas = await html2canvas(element, {
+    scale: 4,
+    useCORS: true,
+  });
+
+  // ✅ Restore buttons after capture
+  buttons.forEach(btn => (btn.style.display = ""));
+
+  const imgData = canvas.toDataURL("image/png");
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  const pageWidth = 210;
+  const pageHeight = 295;
+  const imgWidth = pageWidth;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+
+  pdf.save(`Purchase_${purchaseId || "All"}.pdf`);
+
+  element.style.height = originalHeight;
+  element.style.overflow = originalOverflow;
+};
 const randomNames = [
   // 👨 Men
   "அருண்","கார்த்திக்","விஜய்","அஜித்","சூர்யா","தினேஷ","முருகன்","செந்தில்","கணேஷ்","குமரன்",
@@ -101,6 +157,66 @@ const purchaseNames = [
   "கௌரி","விஷால்","பவானி","சக்தி","சக்திவேல்","சதீஷ்","பானுமதி","சுந்தர்","ராதா","கிருபா",
   "ஆதிரா","துளசி","மயில்விழி","சூர்யகாந்தி","பூங்கவி","இளஞ்செழியன்","வசந்த்","காயத்ரி","அமலா","ஹேமா"
 ];
+
+const handlePurchaseThingSelect = (item) => {
+  let selected = purchase.thing ? purchase.thing.split(",") : [];
+
+  if (item === "Others") {
+    if (showOthersPurchase) {
+      setShowOthersPurchase(false);
+      setCustomPurchaseThing("");
+
+      const updated = selected.filter(val => items.includes(val));
+      setPurchase({ ...purchase, thing: updated.join(",") });
+    } else {
+      setShowOthersPurchase(true);
+    }
+    return;
+  }
+
+  if (selected.includes(item)) {
+    selected = selected.filter(i => i !== item);
+  } else {
+    selected.push(item);
+  }
+
+  setPurchase({ ...purchase, thing: selected.join(",") });
+};
+const handleCustomPurchaseThing = (value) => {
+  setCustomPurchaseThing(value);
+
+  let selected = purchase.thing ? purchase.thing.split(",") : [];
+
+  selected = selected.filter(val => items.includes(val));
+
+  if (value.trim() !== "") {
+    selected.push(value.trim());
+  }
+
+  setPurchase({ ...purchase, thing: selected.join(",") });
+};
+const deletePurchase = async (purchaseId) => {
+  if (!db || !firestoreFunctions) {
+    alert("Firebase not connected");
+    return;
+  }
+
+  const confirmDelete = window.confirm("Are you sure you want to delete this purchase?");
+  if (!confirmDelete) return;
+
+  try {
+    await firestoreFunctions.deleteDoc(
+      firestoreFunctions.doc(db, "purchases", purchaseId)
+    );
+
+    setPurchases(prev => prev.filter(p => p.id !== purchaseId));
+    alert("✅ Purchase deleted successfully");
+  } catch (err) {
+    console.error(err);
+    alert("❌ Failed to delete purchase");
+  }
+};
+const [purchases, setPurchases] = useState([]);
 const resetPurchase = () => {
   setFromDate("");
   setToDate("");
@@ -108,9 +224,11 @@ const resetPurchase = () => {
   setPurchase({
     date: new Date().toISOString().split("T")[0],
     thing: "",
-    tons: "",
+    kilos: "",
     ratePerKg: "",
     entries: "",
+    company: "",
+    company: "",
     splits: [],
     totalKg: 0,
     totalAmount: 0
@@ -171,13 +289,13 @@ const savePurchase = async () => {
     return;
   }
 
-  if (!purchase.tons || !purchase.ratePerKg || !purchase.entries) {
+  if (!purchase.kilos || !purchase.ratePerKg || !purchase.entries) {
     alert("Please fill all required fields");
     return;
   }
 
   try {
-    await firestoreFunctions.addDoc(
+    const docRef = await firestoreFunctions.addDoc(
       firestoreFunctions.collection(db, "purchases"),
       {
         ...purchase,
@@ -188,8 +306,21 @@ const savePurchase = async () => {
       }
     );
 
+    // ✅ 🔥 ADD THIS (instant UI update)
+    const newPurchase = {
+      id: docRef.id,
+      ...purchase,
+      fromDate,
+      toDate: toDate || fromDate,
+      createdAt: new Date().toISOString(),
+      timestamp: Date.now()
+    };
+
+    setPurchases(prev => [newPurchase, ...prev]); // 👈 THIS LINE FIXES YOUR ISSUE
+
     alert("✅ Purchase saved successfully");
     resetPurchase();
+
   } catch (err) {
     console.error(err);
     alert("❌ Failed to save purchase");
@@ -223,11 +354,11 @@ const splitWeight = (totalKg, rate) => {
   return result;
 };
 useEffect(() => {
-  const tons = Number(purchase.tons);
+ const kilos = Number(purchase.kilos);
   const rate = Number(purchase.ratePerKg);
   const entries = Number(purchase.entries);
 
-  if (!fromDate || tons <= 0 || rate <= 0 || entries <= 0) {
+  if (!fromDate || kilos <= 0|| rate <= 0 || entries <= 0) {
     setPurchase(prev => ({
       ...prev,
       splits: [],
@@ -235,8 +366,8 @@ useEffect(() => {
     }));
     return;
   }
-
-  const totalKg = tons * 1000;
+const totalKg = kilos;
+  
 
   const splits = splitPurchase(
     totalKg,
@@ -255,7 +386,7 @@ useEffect(() => {
     totalAmount
   }));
 }, [
-  purchase.tons,
+  purchase.kilos,
   purchase.ratePerKg,
   purchase.entries,
   fromDate,
@@ -333,11 +464,7 @@ useEffect(() => {
   const [firestoreFunctions, setFirestoreFunctions] = useState(null);
   const [searchDate, setSearchDate] = useState('');
   const [statementType, setStatementType] = useState("All");
-
-
-
-
-
+  
 
   const generateStatement = () => {
     if (!fromDate) {
@@ -669,44 +796,55 @@ const unformatNumber = (value) =>
 
 
   const loadData = async (database, functions) => {
-    try {
-      // Farmers
-      const farmersSnapshot = await functions.getDocs(
-        functions.collection(database, "farmers")
-      );
-      const farmersData = farmersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+  try {
+    // ✅ Farmers
+    const farmersSnapshot = await functions.getDocs(
+      functions.collection(database, "farmers")
+    );
+    const farmersData = farmersSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
-      // Dealers
-      const dealersSnapshot = await functions.getDocs(
-        functions.collection(database, "dealers")
-      );
-      const dealersData = dealersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    // ✅ Dealers
+    const dealersSnapshot = await functions.getDocs(
+      functions.collection(database, "dealers")
+    );
+    const dealersData = dealersSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
-      // ✅ DEBTS
-      const debtsSnapshot = await functions.getDocs(
-        functions.collection(database, "debts")
-      );
-      const debtsData = debtsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    // ✅ Debts
+    const debtsSnapshot = await functions.getDocs(
+      functions.collection(database, "debts")
+    );
+    const debtsData = debtsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
-      setFarmers(farmersData);
-      setDealers(dealersData);
-      setDebts(debtsData);
+    // ✅ 🆕 Purchases (THIS WAS MISSING)
+    const purchasesSnapshot = await functions.getDocs(
+      functions.collection(database, "purchases")
+    );
+    const purchasesData = purchasesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
 
-      setLoading(false);
-    } catch (err) {
-      console.error(err);
-      throw err;
-    }
-  };
+    // ✅ Set all states
+    setFarmers(farmersData);
+    setDealers(dealersData);
+    setDebts(debtsData);
+    setPurchases(purchasesData); // 🔥 IMPORTANT
+
+    setLoading(false);
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
+};
 
 
   const saveToFirebase = async (type, data) => {
@@ -2165,8 +2303,10 @@ ${text}
               )}
           </div>
         )}
-      {activeTab === "purchase" && (
+   {activeTab === "purchase" && (
   <div className="bg-white p-6 rounded shadow space-y-4">
+
+    {/* ===== PURCHASE FORM ===== */}
 
     {/* Dates */}
     <div className="flex gap-4">
@@ -2195,21 +2335,62 @@ ${text}
       }
       className="border px-3 py-2 rounded w-full"
     />
+   <input
+  type="text"
+  placeholder="Company Name"
+  value={purchase.company}
+  onChange={e =>
+    setPurchase({ ...purchase, company: e.target.value })
+  }
+  className="border px-3 py-2 rounded w-full"
+/>
 
     {/* Item */}
-    <input
-      placeholder="பொருள்"
-      value={purchase.thing}
-      onChange={e => setPurchase({ ...purchase, thing: e.target.value })}
-      className="border px-3 py-2 rounded w-full"
-    />
+    <div className="space-y-2">
+      <label className="font-medium">பொருள்</label>
 
-    {/* Tons */}
+      <div className="grid grid-cols-2 gap-2">
+        {items.map((item, idx) => (
+          <label key={idx} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={
+                purchase.thing.split(",").includes(item) ||
+                (item === "Others" && showOthersPurchase)
+              }
+              onChange={() => handlePurchaseThingSelect(item)}
+            />
+            {item}
+          </label>
+        ))}
+      </div>
+
+      {showOthersPurchase && (
+        <input
+          type="text"
+          placeholder="Enter custom item"
+          value={customPurchaseThing}
+          onChange={(e) => handleCustomPurchaseThing(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full"
+        />
+      )}
+
+      <input
+        type="text"
+        value={purchase.thing}
+        readOnly
+        className="px-4 py-2 border rounded-lg bg-gray-100"
+      />
+    </div>
+
+    {/* Kilos */}
     <input
       type="number"
-      placeholder="Tons"
-      value={purchase.tons}
-      onChange={e => setPurchase({ ...purchase, tons: e.target.value })}
+      placeholder="Kilos"
+      value={purchase.kilos}
+      onChange={(e) =>
+        setPurchase({ ...purchase, kilos: e.target.value })
+      }
       className="border px-3 py-2 rounded w-full"
     />
 
@@ -2224,12 +2405,10 @@ ${text}
       className="border px-3 py-2 rounded w-full"
     />
 
-    {/* ===== TOTALS + ACTION BUTTONS ===== */}
+    {/* Totals + Buttons */}
     <div className="flex items-center justify-between border-t pt-4 mt-4">
       <div>
-        <p className="font-bold">
-          Total Tons: {(purchase.totalKg / 1000).toFixed(2)}
-        </p>
+        <p className="font-bold">Total Kilos: {purchase.totalKg}</p>
         <p className="font-bold text-green-600">
           Total Amount: ₹ {purchase.totalAmount}
         </p>
@@ -2238,29 +2417,29 @@ ${text}
       <div className="flex gap-3">
         <button
           onClick={savePurchase}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          className="bg-green-600 text-white px-4 py-2 rounded"
         >
           💾 Save Purchase
         </button>
 
         <button
           onClick={resetPurchase}
-          className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+          className="bg-red-500 text-white px-4 py-2 rounded"
         >
           🔄 Reset
         </button>
       </div>
     </div>
 
-    {/* ===== SPLIT TABLE ===== */}
+    {/* Split Table */}
     {purchase.splits.length > 0 && (
       <table className="w-full border mt-4">
         <thead className="bg-gray-100">
           <tr>
-            <th className="text-left p-2 border">Date</th>
-            <th className="text-left p-2 border">Name</th>
-            <th className="text-right p-2 border">Weight</th>
-            <th className="text-right p-2 border">Amount</th>
+            <th className="p-2 border">Date</th>
+            <th className="p-2 border">Name</th>
+            <th className="p-2 border">Weight</th>
+            <th className="p-2 border">Amount</th>
           </tr>
         </thead>
 
@@ -2269,13 +2448,97 @@ ${text}
             <tr key={i}>
               <td className="border p-2">{r.date}</td>
               <td className="border p-2">{r.name}</td>
-              <td className="border p-2 text-right">{r.displayWeight}</td>
-              <td className="border p-2 text-right">₹ {r.amount}</td>
+              <td className="border p-2">{r.displayWeight}</td>
+              <td className="border p-2">₹ {r.amount}</td>
             </tr>
           ))}
         </tbody>
       </table>
     )}
+
+    {/* ===== SAVED PURCHASES LIST ===== */}
+
+    <div className="mt-6">
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-xl font-bold">📦 Saved Purchases</h2>
+
+        {/* ✅ DOWNLOAD BUTTON */}
+        {/* <button
+          onClick={downloadPurchasePDF}
+          className="bg-red-600 text-white px-4 py-2 rounded"
+        >
+          📄 Download PDF
+        </button> */}
+      </div>
+
+      {/* ✅ WRAP ONLY THIS PART */}
+      <div id="purchase-pdf">
+
+  {purchases.length === 0 ? (
+    <p className="text-gray-500">No purchases found</p>
+  ) : (
+    purchases.map(p => (
+      <div id={`purchase-${p.id}`} key={p.id} className="border p-4 rounded mb-3 bg-gray-50 text-base">
+
+        {/* Buttons - hidden during PDF capture */}
+        <div className="flex justify-end mb-2">
+          <div className="flex gap-3">
+            <button
+              onClick={() => downloadPurchasePDF(p.id)}
+              className="bg-red-600 text-white px-3 py-2 rounded text-sm"
+            >
+              📄 Download PDF
+            </button>
+
+            <button
+              onClick={() => deletePurchase(p.id)}
+              className="bg-gray-800 text-white px-3 py-1 rounded text-sm"
+            >
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+
+        <p className="text-lg"><b>From:</b> {p.fromDate}</p>
+        <p className="text-lg"><b>To:</b> {p.toDate}</p>
+        <p className="text-lg"><b>பொருள்:</b> {p.thing}</p>
+        {/* <p className="text-lg"><b>Entries:</b> {p.entries}</p> */}
+        <p className="text-lg"><b>Company:</b> {p.company}</p>
+        <p className="text-lg"><b>மொத்த எடை:</b> {p.totalKg}</p>
+        <p className="text-lg"><b>விலை:</b> ₹{p.ratePerKg}</p>
+        <p className="text-lg text-green-600 font-bold">
+          Total Amount: ₹{p.totalAmount}
+        </p>
+
+        {p.splits && p.splits.length > 0 && (
+          <table className="w-full border mt-3 text-base">
+            <thead className="bg-gray-200">
+              <tr>
+                <th className="border p-2">Date</th>
+                <th className="border p-2">Name</th>
+                <th className="border p-2">Weight</th>
+                <th className="border p-2">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {p.splits.map((s, i) => (
+                <tr key={i}>
+                  <td className="border p-2">{s.date}</td>
+                  <td className="border p-2">{s.name}</td>
+                  <td className="border p-2">{s.displayWeight}</td>
+                  <td className="border p-2">₹{s.amount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+      </div>
+    ))
+  )}
+
+</div>
+    </div>
 
   </div>
 )}
