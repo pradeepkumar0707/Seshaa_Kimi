@@ -236,9 +236,8 @@ const resetPurchase = () => {
 };
 
 const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
-  const MIN_KG = 10;
+  if (!totalKg || !count) return [];
 
-  // ✅ SAFE DATE HANDLING
   const start = fromDate ? new Date(fromDate) : new Date();
   if (isNaN(start)) return [];
 
@@ -248,40 +247,48 @@ const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
   const days =
     Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-  if (count * MIN_KG > totalKg) return [];
-
-  let remainingKg = totalKg - count * MIN_KG;
-
-  const shuffled = [...randomNames].sort(() => Math.random() - 0.5);
+  const avg = Math.floor(totalKg / count); // base average
+  const variation = Math.floor(avg * 0.3); // ±30%
 
   let result = [];
+  let remaining = totalKg;
+
+  const shuffled = [...randomNames].sort(() => Math.random() - 0.5);
 
   for (let i = 0; i < count; i++) {
     const date = new Date(start);
     date.setDate(start.getDate() + (i % days));
 
+    let weight;
+
+    if (i === count - 1) {
+      // last gets remaining → always exact total
+      weight = remaining;
+    } else {
+      let min = avg - variation;
+      let max = avg + variation;
+
+      // safety (don’t break remaining)
+      min = Math.max(10, min);
+      max = Math.min(max, remaining - (count - i - 1) * 10);
+
+      weight =
+        Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
     result.push({
-      date: date.toISOString().split("T")[0], // ✅ SAFE NOW
+      date: date.toISOString().split("T")[0],
       name: shuffled[i] || `Name ${i + 1}`,
-      weightKg: MIN_KG,
-      amount: MIN_KG * rate
+      weightKg: weight,
+      amount: weight * rate
     });
+
+    remaining -= weight;
   }
 
-  while (remainingKg > 0) {
-    const index = Math.floor(Math.random() * count);
-    result[index].weightKg += 1;
-    result[index].amount += rate;
-    remainingKg -= 1;
-  }
-
- return result
-  .sort((a, b) => new Date(a.date) - new Date(b.date)) // ✅ ASCENDING DATE
-  .map(r => ({
-    ...r,
-    displayWeight: (r.weightKg / 100).toFixed(2)
-  }));
-
+  return result.sort(
+    (a, b) => new Date(a.date) - new Date(b.date)
+  );
 };
 const savePurchase = async () => {
   if (!db || !firestoreFunctions) {
@@ -327,7 +334,10 @@ const savePurchase = async () => {
   }
 };
 
-
+const formatWeight = (w) => {
+  if (!w) return "0.00";
+  return (Number(w) / 100).toFixed(2);
+};
 const splitWeight = (totalKg, rate) => {
   let remaining = totalKg;
   let result = [];
@@ -2448,7 +2458,7 @@ ${text}
             <tr key={i}>
               <td className="border p-2">{r.date}</td>
               <td className="border p-2">{r.name}</td>
-              <td className="border p-2">{r.displayWeight}</td>
+              <td className="border p-2">{formatWeight(r.weightKg)}</td>
               <td className="border p-2">₹ {r.amount}</td>
             </tr>
           ))}
@@ -2525,7 +2535,7 @@ ${text}
                 <tr key={i}>
                   <td className="border p-2">{s.date}</td>
                   <td className="border p-2">{s.name}</td>
-                  <td className="border p-2">{s.displayWeight}</td>
+                  <td className="border p-2"> {formatWeight(s.weightKg)}</td>
                   <td className="border p-2">₹{s.amount}</td>
                 </tr>
               ))}
