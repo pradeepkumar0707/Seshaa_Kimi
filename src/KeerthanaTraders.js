@@ -57,57 +57,45 @@ const [customPurchaseThing, setCustomPurchaseThing] = useState("");
   totalKg: 0,
   totalAmount: 0
 });
-const downloadPurchasePDF = async (purchaseId) => {
-  const elementId = purchaseId ? `purchase-${purchaseId}` : "purchase-pdf";
-  const element = document.getElementById(elementId);
-
-  if (!element) {
-    alert("No data to download");
+const downloadPurchaseExcel = (purchaseData, purchaseId) => {
+  if (!purchaseData?.splits?.length) {
+    alert("No data to export");
     return;
   }
 
-  // ✅ Hide all buttons inside the element before capture
-  const buttons = element.querySelectorAll("button");
-  buttons.forEach(btn => (btn.style.display = "none"));
+  const excelData = purchaseData.splits.map((item, index) => ({
+    // "S.No": index + 1,
+    "Date": item.date,
+    "Name": item.name,
+   "Weight (Kg)": (Number(item.weightKg) / 100).toFixed(2),
+    "Rate": purchaseData.ratePerKg,
+    "Amount": item.amount
+  }));
 
-  const originalHeight = element.style.height;
-  const originalOverflow = element.style.overflow;
-  element.style.height = "auto";
-  element.style.overflow = "visible";
+  excelData.push({
+  // "S.No": "",
+  "Date": "",
+  "Name": "TOTAL",
+  "Weight (Kg)": (Number(purchaseData.totalKg) / 100).toFixed(2),
+  "Rate": "",
+  "Amount": purchaseData.totalAmount
+});
 
-  const canvas = await html2canvas(element, {
-    scale: 4,
-    useCORS: true,
+  const ws = XLSX.utils.json_to_sheet(excelData);
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "Purchase");
+
+  const buffer = XLSX.write(wb, {
+    bookType: "xlsx",
+    type: "array"
   });
 
-  // ✅ Restore buttons after capture
-  buttons.forEach(btn => (btn.style.display = ""));
+  const blob = new Blob([buffer], {
+    type: "application/octet-stream"
+  });
 
-  const imgData = canvas.toDataURL("image/png");
-  const pdf = new jsPDF("p", "mm", "a4");
-
-  const pageWidth = 210;
-  const pageHeight = 295;
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-  }
-
-  pdf.save(`Purchase_${purchaseId || "All"}.pdf`);
-
-  element.style.height = originalHeight;
-  element.style.overflow = originalOverflow;
+  saveAs(blob, `Purchase_${purchaseId}.xlsx`);
 };
 const randomNames = [
   // 👨 Men
@@ -2493,12 +2481,11 @@ ${text}
         {/* Buttons - hidden during PDF capture */}
         <div className="flex justify-end mb-2">
           <div className="flex gap-3">
-            <button
-              onClick={() => downloadPurchasePDF(p.id)}
-              className="bg-red-600 text-white px-3 py-2 rounded text-sm"
-            >
-              📄 Download PDF
-            </button>
+           <button
+  onClick={() => downloadPurchaseExcel(p, p.id)}
+>
+  📊 Excel
+</button>
 
             <button
               onClick={() => deletePurchase(p.id)}
