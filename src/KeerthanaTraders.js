@@ -63,19 +63,23 @@ const downloadPurchaseExcel = (purchaseData, purchaseId) => {
     return;
   }
 
-  const excelData = purchaseData.splits.map((item, index) => ({
-    // "S.No": index + 1,
-    "Date": item.date,
-    "Name": item.name,
-   "Weight (Kg)": (Number(item.weightKg) / 100).toFixed(2),
-    "Rate": purchaseData.ratePerKg,
-    "Amount": item.amount
-  }));
+ const excelData = purchaseData.splits.map((item, index) => ({
+  // "S.No": index + 1,
+  "Date": item.date,
+  "Name": item.name,
+  "பொருள்": purchaseData.thing || "",
+  "Company": purchaseData.company || "",
+  "Weight (Kg)": (Number(item.weightKg) / 100).toFixed(2),
+  "Rate": purchaseData.ratePerKg,
+  "Amount": item.amount
+}));
 
-  excelData.push({
+ excelData.push({
   // "S.No": "",
   "Date": "",
-  "Name": "TOTAL",
+  "Name": "",
+  "பொருள்": "",
+  "Company": "TOTAL",
   "Weight (Kg)": (Number(purchaseData.totalKg) / 100).toFixed(2),
   "Rate": "",
   "Amount": purchaseData.totalAmount
