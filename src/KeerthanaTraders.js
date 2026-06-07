@@ -230,52 +230,48 @@ const resetPurchase = () => {
 const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
   if (!totalKg || !count) return [];
 
-  const start = fromDate ? new Date(fromDate) : new Date();
-  if (isNaN(start)) return [];
-
-  const end =
-    toDate && !isNaN(new Date(toDate)) ? new Date(toDate) : start;
+  const start = new Date(fromDate);
+  const end = new Date(toDate || fromDate);
 
   const days =
     Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
-  const avg = Math.floor(totalKg / count); // base average
-  const variation = Math.floor(avg * 0.3); // ±30%
 
   let result = [];
   let remaining = totalKg;
 
   const shuffled = [...randomNames].sort(() => Math.random() - 0.5);
 
+  const avg = Math.floor(totalKg / count);
+  const variation = Math.floor(avg * 0.3);
+
   for (let i = 0; i < count; i++) {
+
+    // ✅ Random day between fromDate and toDate
+    const randomDay = Math.floor(Math.random() * days);
+
     const date = new Date(start);
-    date.setDate(start.getDate() + (i % days));
+    date.setDate(start.getDate() + randomDay);
 
     let weight;
 
     if (i === count - 1) {
-      // last gets remaining → always exact total
       weight = remaining;
     } else {
-      let min = avg - variation;
-      let max = avg + variation;
-
-      // safety (don’t break remaining)
-      min = Math.max(10, min);
-      max = Math.min(max, remaining - (count - i - 1) * 10);
+      const min = Math.max(10, avg - variation);
+      const max = avg + variation;
 
       weight =
         Math.floor(Math.random() * (max - min + 1)) + min;
     }
 
+    remaining -= weight;
+
     result.push({
       date: date.toISOString().split("T")[0],
-      name: shuffled[i] || `Name ${i + 1}`,
+      name: shuffled[i],
       weightKg: weight,
       amount: weight * rate
     });
-
-    remaining -= weight;
   }
 
   return result.sort(
