@@ -270,7 +270,7 @@ const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
       date: date.toISOString().split("T")[0],
       name: shuffled[i],
       weightKg: weight,
-      amount: weight * rate
+      amount: Math.round(weight * rate)
     });
   }
 
@@ -375,7 +375,9 @@ const totalKg = kilos;
     toDate
   );
 
-  const totalAmount = splits.reduce((sum, i) => sum + i.amount, 0);
+  const totalAmount = Math.round(
+  splits.reduce((sum, i) => sum + i.amount, 0)
+);
 
   setPurchase(prev => ({
     ...prev,
