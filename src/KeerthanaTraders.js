@@ -35,6 +35,16 @@ const KeerthanaTraders = () => {
   const [firebaseReady, setFirebaseReady] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   const [fromDate, setFromDate] = useState("");
+  const [editingPeriodId, setEditingPeriodId] = useState(null);
+
+const [editingPeriod, setEditingPeriod] = useState({
+  fromDate: "",
+  toDate: "",
+  thing: "",
+  kilos: "",
+  ratePerKg: "",
+  entries: ""
+});
   const [toDate, setToDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("Completed");
   const [statementData, setStatementData] = useState([]);
@@ -509,31 +519,42 @@ const resetPurchase = () => {
   });
 };
 
-const splitPurchase = (
-  totalKg,
-  rate,
-  count,
-  fromDate,
-  toDate,
-  product
-) => {
+const splitPurchase = (totalKg, rate, count, fromDate, toDate, product) => {
   if (!totalKg || !count || !fromDate) return [];
+
+  totalKg = Number(totalKg);
+  rate = Number(rate);
+  count = Number(count);
+
+  // Make sure every entry can receive at least 1 kg
+  if (totalKg < count) {
+    alert(`Total weight must be at least ${count} kg.`);
+    return [];
+  }
 
   const start = new Date(fromDate);
   const end = new Date(toDate || fromDate);
 
   const days =
-    Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    Math.floor(
+      (end - start) / (1000 * 60 * 60 * 24)
+    ) + 1;
 
-  let result = [];
-  let remaining = Number(totalKg);
+  // Shuffle names - repeated names are allowed
+  const shuffled = [...randomNames].sort(
+    () => Math.random() - 0.5
+  );
 
-  const shuffled = [...randomNames].sort(() => Math.random() - 0.5);
+  let remaining = totalKg;
+  const result = [];
 
-  const avg = Math.floor(totalKg / count);
-  const variation = Math.floor(avg * 0.3);
+  const avg = totalKg / count;
+  const variation = avg * 0.3;
 
   for (let i = 0; i < count; i++) {
+    const entriesLeft = count - i;
+
+    // Generate random date
     const randomDay = Math.floor(Math.random() * days);
 
     const date = new Date(start);
@@ -541,39 +562,73 @@ const splitPurchase = (
 
     let weight;
 
-    if (i === count - 1) {
+    // Last entry gets all remaining weight
+    if (entriesLeft === 1) {
       weight = remaining;
     } else {
-      const min = Math.max(10, avg - variation);
-      const max = avg + variation;
+      // Reserve at least 1 kg for every remaining entry
+      const minimumForOthers = entriesLeft - 1;
 
-      weight =
-        Math.floor(Math.random() * (max - min + 1)) + min;
+      const minWeight = Math.max(
+        1,
+        Math.floor(avg - variation)
+      );
 
-      // Safety
-      if (weight > remaining) {
-        weight = remaining;
+      const maxWeight = Math.min(
+        Math.floor(avg + variation),
+        remaining - minimumForOthers
+      );
+
+      if (maxWeight >= minWeight) {
+        weight =
+          Math.floor(
+            Math.random() *
+              (maxWeight - minWeight + 1)
+          ) + minWeight;
+      } else {
+        // Safe fallback
+        weight = Math.floor(
+          remaining / entriesLeft
+        );
       }
+    }
+
+    // Never allow zero or negative weight
+    weight = Math.max(1, Math.floor(weight));
+
+    // Make sure enough weight remains for the other entries
+    if (entriesLeft > 1) {
+      weight = Math.min(
+        weight,
+        remaining - (entriesLeft - 1)
+      );
     }
 
     remaining -= weight;
 
     result.push({
       date: date.toISOString().split("T")[0],
-      name: shuffled[i],
+
+      // Repeated names are allowed
+      name: shuffled[i % shuffled.length],
+
+      // Always greater than 0
       weightKg: weight,
+
+      // Always greater than 0
       amount: Math.round(weight * rate),
 
-      // Save the rate-period information with every entry
       periodFromDate: fromDate,
       periodToDate: toDate || fromDate,
       periodProduct: product,
-      periodRate: Number(rate)
+      periodRate: rate,
     });
   }
 
+  // Sort by date
   return result.sort(
-    (a, b) => new Date(a.date) - new Date(b.date)
+    (a, b) =>
+      new Date(a.date) - new Date(b.date)
   );
 };
 const addPurchaseRatePeriod = () => {
@@ -644,6 +699,172 @@ const addPurchaseRatePeriod = () => {
     ratePerKg: "",
     entries: ""
   }));
+};
+// ==========================================
+// EDIT PURCHASE PERIOD
+// ==========================================
+const startEditPurchasePeriod = (period) => {
+  setEditingPeriodId(period.id);
+
+  setEditingPeriod({
+    fromDate: period.fromDate || "",
+    toDate: period.toDate || "",
+    thing: period.thing || "",
+    kilos: period.kilos || "",
+    ratePerKg: period.ratePerKg || "",
+    entries: period.entries || ""
+  });
+};
+
+
+// ==========================================
+// SAVE EDITED PURCHASE PERIOD
+// ==========================================
+const saveEditedPurchasePeriod = () => {
+  const {
+    fromDate,
+    toDate,
+    thing,
+    kilos,
+    ratePerKg,
+    entries
+  } = editingPeriod;
+
+  // Validation
+  if (
+    !fromDate ||
+    !thing ||
+    !kilos ||
+    !ratePerKg ||
+    !entries
+  ) {
+    alert(
+      "Please fill From Date, Product, Kilos, Rate and Number of Entries."
+    );
+    return;
+  }
+
+  if (toDate && new Date(toDate) < new Date(fromDate)) {
+    alert("To Date cannot be before From Date.");
+    return;
+  }
+
+  const totalKg = Number(kilos);
+  const rate = Number(ratePerKg);
+  const count = Number(entries);
+
+  if (totalKg <= 0) {
+    alert("Kilos must be greater than 0.");
+    return;
+  }
+
+  if (rate <= 0) {
+    alert("Rate must be greater than 0.");
+    return;
+  }
+
+  if (count <= 0) {
+    alert("Number of Entries must be greater than 0.");
+    return;
+  }
+
+  // Generate new splits
+  const newSplits = splitPurchase(
+    totalKg,
+    rate,
+    count,
+    fromDate,
+    toDate || fromDate,
+    thing
+  );
+
+  // Make sure split was successful
+  if (!newSplits || newSplits.length === 0) {
+    alert("Could not generate purchase entries.");
+    return;
+  }
+
+  // Make sure there are no zero/empty weights
+  const hasInvalidSplit = newSplits.some(
+    item =>
+      !item.weightKg ||
+      Number(item.weightKg) <= 0 ||
+      !item.amount ||
+      Number(item.amount) <= 0
+  );
+
+  if (hasInvalidSplit) {
+    alert(
+      "Some entries have zero/empty weight or amount. Please check the values."
+    );
+    return;
+  }
+
+  const newTotalKg = newSplits.reduce(
+    (sum, item) => sum + Number(item.weightKg || 0),
+    0
+  );
+
+  const newTotalAmount = newSplits.reduce(
+    (sum, item) => sum + Number(item.amount || 0),
+    0
+  );
+
+  setPurchase(prev => ({
+    ...prev,
+
+    ratePeriods: prev.ratePeriods.map(period => {
+      if (period.id !== editingPeriodId) {
+        return period;
+      }
+
+      return {
+        ...period,
+
+        fromDate: fromDate,
+        toDate: toDate || fromDate,
+
+        thing: thing,
+        kilos: totalKg,
+        ratePerKg: rate,
+        entries: count,
+
+        splits: newSplits,
+
+        totalKg: newTotalKg,
+        totalAmount: newTotalAmount
+      };
+    })
+  }));
+
+  // Close edit mode
+  setEditingPeriodId(null);
+
+  setEditingPeriod({
+    fromDate: "",
+    toDate: "",
+    thing: "",
+    kilos: "",
+    ratePerKg: "",
+    entries: ""
+  });
+};
+
+
+// ==========================================
+// CANCEL EDIT
+// ==========================================
+const cancelEditPurchasePeriod = () => {
+  setEditingPeriodId(null);
+
+  setEditingPeriod({
+    fromDate: "",
+    toDate: "",
+    thing: "",
+    kilos: "",
+    ratePerKg: "",
+    entries: ""
+  });
 };
 const savePurchase = async () => {
   if (!db || !firestoreFunctions) {
@@ -2912,6 +3133,8 @@ ${text}
   </button>
 </div>
 {/* ===== ADDED PURCHASE PERIODS ===== */}
+{/* ===== ADDED PURCHASE PERIODS ===== */}
+
 {purchase.ratePeriods.length > 0 && (
   <div className="mt-4 border rounded-lg p-4 bg-blue-50">
 
@@ -2919,46 +3142,300 @@ ${text}
       📋 Added Purchase Periods
     </h3>
 
-    <div className="space-y-2">
+    <div className="space-y-3">
+
       {purchase.ratePeriods.map((period, index) => (
+
         <div
           key={period.id}
-          className="bg-white border rounded-lg p-3 flex items-center justify-between"
+          className="bg-white border rounded-lg p-3"
         >
-          <div>
-            <p className="font-semibold">
-              {index + 1}. {period.thing}
-            </p>
 
-            <p className="text-sm text-gray-600">
-              {period.fromDate} → {period.toDate}
-            </p>
+          {/* ==========================================
+              NORMAL VIEW
+              ========================================== */}
 
-            <p className="text-sm">
-              Rate: ₹{period.ratePerKg}/Kg
-              {" | "}
-              Weight: {period.totalKg} Kg
-              {" | "}
-              Amount: ₹{period.totalAmount}
-            </p>
-          </div>
+          {editingPeriodId !== period.id && (
 
-          <button
-            type="button"
-            onClick={() => {
-              setPurchase(prev => ({
-                ...prev,
-                ratePeriods: prev.ratePeriods.filter(
-                  p => p.id !== period.id
-                )
-              }));
-            }}
-            className="bg-red-500 text-white px-3 py-1 rounded"
-          >
-            🗑️
-          </button>
+            <div className="flex items-center justify-between">
+
+              <div>
+
+                <p className="font-semibold">
+                  {index + 1}. {period.thing}
+                </p>
+
+                <p className="text-sm text-gray-600">
+                  {period.fromDate} → {period.toDate}
+                </p>
+
+                <p className="text-sm">
+                  Rate: ₹{period.ratePerKg}/Kg
+                  {" | "}
+                  Weight: {period.totalKg} Kg
+                  {" | "}
+                  Amount: ₹{period.totalAmount}
+                </p>
+
+                <p className="text-xs text-gray-500 mt-1">
+                  Entries: {period.entries}
+                </p>
+
+              </div>
+
+
+              {/* BUTTONS */}
+
+              <div className="flex gap-2">
+
+                {/* EDIT */}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    startEditPurchasePeriod(period)
+                  }
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center gap-1"
+                  title="Edit Purchase Period"
+                >
+                  <Edit size={18} />
+                  Edit
+                </button>
+
+
+                {/* DELETE */}
+
+                <button
+                  type="button"
+                  onClick={() => {
+
+                    if (
+                      window.confirm(
+                        "Are you sure you want to delete this purchase period?"
+                      )
+                    ) {
+
+                      setPurchase(prev => ({
+                        ...prev,
+
+                        ratePeriods:
+                          prev.ratePeriods.filter(
+                            p => p.id !== period.id
+                          )
+                      }));
+
+                    }
+
+                  }}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg flex items-center gap-1"
+                  title="Delete Purchase Period"
+                >
+                  <Trash2 size={18} />
+                  Delete
+                </button>
+
+              </div>
+
+            </div>
+
+          )}
+
+
+          {/* ==========================================
+              EDIT MODE
+              ========================================== */}
+
+          {editingPeriodId === period.id && (
+
+            <div className="space-y-3">
+
+              <div className="font-bold text-lg text-blue-700">
+                ✏️ Edit Purchase Period
+              </div>
+
+
+              {/* DATE */}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                <div>
+
+                  <label className="block text-sm font-semibold mb-1">
+                    From Date
+                  </label>
+
+                  <input
+                    type="date"
+                    value={editingPeriod.fromDate}
+                    onChange={e =>
+                      setEditingPeriod(prev => ({
+                        ...prev,
+                        fromDate: e.target.value
+                      }))
+                    }
+                    className="border px-3 py-2 rounded w-full"
+                  />
+
+                </div>
+
+
+                <div>
+
+                  <label className="block text-sm font-semibold mb-1">
+                    To Date
+                  </label>
+
+                  <input
+                    type="date"
+                    value={editingPeriod.toDate}
+                    onChange={e =>
+                      setEditingPeriod(prev => ({
+                        ...prev,
+                        toDate: e.target.value
+                      }))
+                    }
+                    className="border px-3 py-2 rounded w-full"
+                  />
+
+                </div>
+
+              </div>
+
+
+              {/* PRODUCT */}
+
+              <div>
+
+                <label className="block text-sm font-semibold mb-1">
+                  Product
+                </label>
+
+                <input
+                  type="text"
+                  value={editingPeriod.thing}
+                  onChange={e =>
+                    setEditingPeriod(prev => ({
+                      ...prev,
+                      thing: e.target.value
+                    }))
+                  }
+                  placeholder="Product"
+                  className="border px-3 py-2 rounded w-full"
+                />
+
+              </div>
+
+
+              {/* KILOS / RATE / ENTRIES */}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+                <div>
+
+                  <label className="block text-sm font-semibold mb-1">
+                    Total Kilos
+                  </label>
+
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={editingPeriod.kilos}
+                    onChange={e =>
+                      setEditingPeriod(prev => ({
+                        ...prev,
+                        kilos: e.target.value
+                      }))
+                    }
+                    placeholder="Kilos"
+                    className="border px-3 py-2 rounded w-full"
+                  />
+
+                </div>
+
+
+                <div>
+
+                  <label className="block text-sm font-semibold mb-1">
+                    Rate per Kg
+                  </label>
+
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={editingPeriod.ratePerKg}
+                    onChange={e =>
+                      setEditingPeriod(prev => ({
+                        ...prev,
+                        ratePerKg: e.target.value
+                      }))
+                    }
+                    placeholder="Rate per Kg"
+                    className="border px-3 py-2 rounded w-full"
+                  />
+
+                </div>
+
+
+                <div>
+
+                  <label className="block text-sm font-semibold mb-1">
+                    Number of Entries
+                  </label>
+
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={editingPeriod.entries}
+                    onChange={e =>
+                      setEditingPeriod(prev => ({
+                        ...prev,
+                        entries: e.target.value
+                      }))
+                    }
+                    placeholder="Entries"
+                    className="border px-3 py-2 rounded w-full"
+                  />
+
+                </div>
+
+              </div>
+
+
+              {/* EDIT BUTTONS */}
+
+              <div className="flex gap-3 pt-2">
+
+                <button
+                  type="button"
+                  onClick={saveEditedPurchasePeriod}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-semibold"
+                >
+                  💾 Save
+                </button>
+
+
+                <button
+                  type="button"
+                  onClick={cancelEditPurchasePeriod}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-semibold"
+                >
+                  <X size={18} />
+                  Cancel
+                </button>
+
+              </div>
+
+            </div>
+
+          )}
+
         </div>
+
       ))}
+
     </div>
 
   </div>
