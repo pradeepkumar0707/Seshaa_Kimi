@@ -3714,7 +3714,7 @@ ${text}
 
 )}
 
-        {p.splits && p.splits.length > 0 && (
+        {/* {p.splits && p.splits.length > 0 && (
           <table className="w-full border mt-3 text-base">
             <thead className="bg-gray-200">
               <tr>
@@ -3735,7 +3735,7 @@ ${text}
               ))}
             </tbody>
           </table>
-        )}
+        )} */}
 
       </div>
     ))
