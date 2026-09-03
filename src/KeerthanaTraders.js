@@ -47,59 +47,339 @@ const KeerthanaTraders = () => {
   const [debtBrokerFilter, setDebtBrokerFilter] = useState("");
   const [showOthersPurchase, setShowOthersPurchase] = useState(false);
 const [customPurchaseThing, setCustomPurchaseThing] = useState("");
-    const [purchase, setPurchase] = useState({
+   const [purchase, setPurchase] = useState({
   date: new Date().toISOString().split("T")[0],
   thing: "",
- kilos: "",
+  kilos: "",
   ratePerKg: "",
-  entries: "",  
+  entries: "",
+  company: "",
   splits: [],
+  ratePeriods: [],
   totalKg: 0,
   totalAmount: 0
 });
 const downloadPurchaseExcel = (purchaseData, purchaseId) => {
-  if (!purchaseData?.splits?.length) {
-    alert("No data to export");
+  if (!purchaseData) {
+    alert("No purchase data found");
     return;
   }
 
- const excelData = purchaseData.splits.map((item, index) => ({
-  // "S.No": index + 1,
-  "Date": item.date,
-  "Name": item.name,
-  "பொருள்": purchaseData.thing || "",
-  "Company": purchaseData.company || "",
-  "Weight (Kg)": (Number(item.weightKg) / 100).toFixed(2),
-  "Rate": purchaseData.ratePerKg,
-  "Amount": item.amount
-}));
+  const periods = purchaseData.ratePeriods || [];
 
- excelData.push({
-  // "S.No": "",
-  "Date": "",
-  "Name": "",
-  "பொருள்": "",
-  "Company": "TOTAL",
-  "Weight (Kg)": (Number(purchaseData.totalKg) / 100).toFixed(2),
-  "Rate": "",
-  "Amount": purchaseData.totalAmount
-});
+  if (periods.length === 0) {
+    alert("No purchase periods found");
+    return;
+  }
 
+  const excelData = [];
+
+  // 🔥 GRAND TOTAL AMOUNT ONLY
+  let grandTotalAmount = 0;
+
+  periods.forEach((period) => {
+    const company =
+      period.company ||
+      purchaseData.company ||
+      "";
+
+    const product =
+      period.thing ||
+      "";
+
+    const rate =
+      Number(period.ratePerKg || 0);
+
+    // =========================
+    // INDIVIDUAL ENTRIES
+    // =========================
+    (period.splits || []).forEach((item) => {
+      const weightKg =
+        Number(item.weightKg || 0);
+
+      const quintals =
+        weightKg / 100;
+
+      const amount =
+        Number(
+          item.amount ||
+          (weightKg * rate)
+        );
+
+      excelData.push({
+        "Date": item.date || "",
+        "Name": item.name || "",
+        "பொருள்": product,
+        "Company": company,
+        "Quintals": Number(quintals.toFixed(2)),
+        "Rate": rate,
+        "Amount": Math.round(amount)
+      });
+    });
+
+    // =========================
+    // PERIOD TOTAL
+    // =========================
+    const periodAmount =
+      Number(period.totalAmount || 0);
+
+    excelData.push({
+      "Date": "",
+      "Name": "",
+      "பொருள்": `${product} TOTAL`,
+      "Company": company,
+      "Quintals": Number(
+        (Number(period.totalKg || 0) / 100).toFixed(2)
+      ),
+      "Rate": rate,
+      "Amount": Math.round(periodAmount)
+    });
+
+    // ✅ ADD PERIOD TOTAL TO GRAND TOTAL
+    grandTotalAmount += periodAmount;
+
+    // =========================
+    // BLANK ROW
+    // =========================
+    excelData.push({
+      "Date": "",
+      "Name": "",
+      "பொருள்": "",
+      "Company": "",
+      "Quintals": "",
+      "Rate": "",
+      "Amount": ""
+    });
+  });
+
+  // =========================
+  // 🔥 GRAND TOTAL - AMOUNT ONLY
+  // =========================
+  excelData.push({
+    "Date": "",
+    "Name": "",
+    "பொருள்": "GRAND TOTAL",
+    "Company": "",
+    "Quintals": "",
+    "Rate": "",
+    "Amount": Math.round(grandTotalAmount)
+  });
+
+  // =========================
+  // CREATE EXCEL SHEET
+  // =========================
   const ws = XLSX.utils.json_to_sheet(excelData);
+
+  ws["!cols"] = [
+    { wch: 15 }, // Date
+    { wch: 20 }, // Name
+    { wch: 20 }, // பொருள்
+    { wch: 20 }, // Company
+    { wch: 12 }, // Quintals
+    { wch: 12 }, // Rate
+    { wch: 18 }  // Amount
+  ];
+
   const wb = XLSX.utils.book_new();
 
-  XLSX.utils.book_append_sheet(wb, ws, "Purchase");
+  XLSX.utils.book_append_sheet(
+    wb,
+    ws,
+    "Purchase"
+  );
 
   const buffer = XLSX.write(wb, {
     bookType: "xlsx",
     type: "array"
   });
 
-  const blob = new Blob([buffer], {
-    type: "application/octet-stream"
+  const blob = new Blob(
+    [buffer],
+    {
+      type: "application/octet-stream"
+    }
+  );
+
+  saveAs(
+    blob,
+    `Purchase_${purchaseId}.xlsx`
+  );
+};
+const downloadAllPurchasesExcel = () => {
+  if (!purchases || purchases.length === 0) {
+    alert("No purchases found");
+    return;
+  }
+
+  const excelData = [];
+
+  // 🔥 GRAND TOTAL AMOUNT ONLY
+  let grandTotalAmount = 0;
+
+  purchases.forEach((purchaseData) => {
+    const periods =
+      purchaseData.ratePeriods || [];
+
+    if (periods.length === 0) {
+      return;
+    }
+
+    periods.forEach((period) => {
+      const company =
+        period.company ||
+        purchaseData.company ||
+        "";
+
+      const product =
+        period.thing ||
+        "";
+
+      const from =
+        period.fromDate ||
+        "";
+
+      const to =
+        period.toDate ||
+        from;
+
+      const rate =
+        Number(period.ratePerKg || 0);
+
+      // =========================
+      // INDIVIDUAL ENTRIES
+      // =========================
+      (period.splits || []).forEach((item) => {
+        const weightKg =
+          Number(item.weightKg || 0);
+
+        const quintals =
+          weightKg / 100;
+
+        const amount =
+          Number(
+            item.amount ||
+            (weightKg * rate)
+          );
+
+        excelData.push({
+          "From Date": from,
+          "To Date": to,
+          "Date": item.date || "",
+          "Name": item.name || "",
+          "பொருள்": product,
+          "Company": company,
+          "Quintals": Number(
+            quintals.toFixed(2)
+          ),
+          "Rate": rate,
+          "Amount": Math.round(amount)
+        });
+      });
+
+      // =========================
+      // PERIOD TOTAL
+      // =========================
+      const periodAmount =
+        Number(period.totalAmount || 0);
+
+      excelData.push({
+        "From Date": "",
+        "To Date": "",
+        "Date": "",
+        "Name": "",
+        "பொருள்": `${product} TOTAL`,
+        "Company": company,
+        "Quintals": Number(
+          (Number(period.totalKg || 0) / 100).toFixed(2)
+        ),
+        "Rate": rate,
+        "Amount": Math.round(periodAmount)
+      });
+
+      // ✅ ADD ONLY PERIOD TOTAL
+      grandTotalAmount += periodAmount;
+
+      // =========================
+      // BLANK ROW
+      // =========================
+      excelData.push({
+        "From Date": "",
+        "To Date": "",
+        "Date": "",
+        "Name": "",
+        "பொருள்": "",
+        "Company": "",
+        "Quintals": "",
+        "Rate": "",
+        "Amount": ""
+      });
+    });
   });
 
-  saveAs(blob, `Purchase_${purchaseId}.xlsx`);
+  if (excelData.length === 0) {
+    alert("No purchase periods found");
+    return;
+  }
+
+  // =========================
+  // 🔥 GRAND TOTAL - AMOUNT ONLY
+  // =========================
+  excelData.push({
+    "From Date": "",
+    "To Date": "",
+    "Date": "",
+    "Name": "",
+    "பொருள்": "GRAND TOTAL",
+    "Company": "",
+    "Quintals": "",
+    "Rate": "",
+    "Amount": Math.round(grandTotalAmount)
+  });
+
+  // =========================
+  // CREATE EXCEL SHEET
+  // =========================
+  const ws =
+    XLSX.utils.json_to_sheet(excelData);
+
+  ws["!cols"] = [
+    { wch: 14 }, // From Date
+    { wch: 14 }, // To Date
+    { wch: 14 }, // Date
+    { wch: 20 }, // Name
+    { wch: 20 }, // பொருள்
+    { wch: 20 }, // Company
+    { wch: 12 }, // Quintals
+    { wch: 12 }, // Rate
+    { wch: 18 }  // Amount
+  ];
+
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(
+    wb,
+    ws,
+    "Purchase"
+  );
+
+  const buffer = XLSX.write(wb, {
+    bookType: "xlsx",
+    type: "array"
+  });
+
+  const blob = new Blob(
+    [buffer],
+    {
+      type: "application/octet-stream"
+    }
+  );
+
+  saveAs(
+    blob,
+    `All_Purchases_${new Date()
+      .toISOString()
+      .split("T")[0]}.xlsx`
+  );
 };
 const randomNames = [
   // 👨 Men
@@ -212,6 +492,8 @@ const [purchases, setPurchases] = useState([]);
 const resetPurchase = () => {
   setFromDate("");
   setToDate("");
+  setShowOthersPurchase(false);
+  setCustomPurchaseThing("");
 
   setPurchase({
     date: new Date().toISOString().split("T")[0],
@@ -220,15 +502,22 @@ const resetPurchase = () => {
     ratePerKg: "",
     entries: "",
     company: "",
-    company: "",
     splits: [],
+    ratePeriods: [],
     totalKg: 0,
     totalAmount: 0
   });
 };
 
-const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
-  if (!totalKg || !count) return [];
+const splitPurchase = (
+  totalKg,
+  rate,
+  count,
+  fromDate,
+  toDate,
+  product
+) => {
+  if (!totalKg || !count || !fromDate) return [];
 
   const start = new Date(fromDate);
   const end = new Date(toDate || fromDate);
@@ -237,7 +526,7 @@ const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
     Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
   let result = [];
-  let remaining = totalKg;
+  let remaining = Number(totalKg);
 
   const shuffled = [...randomNames].sort(() => Math.random() - 0.5);
 
@@ -245,8 +534,6 @@ const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
   const variation = Math.floor(avg * 0.3);
 
   for (let i = 0; i < count; i++) {
-
-    // ✅ Random day between fromDate and toDate
     const randomDay = Math.floor(Math.random() * days);
 
     const date = new Date(start);
@@ -262,6 +549,11 @@ const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
 
       weight =
         Math.floor(Math.random() * (max - min + 1)) + min;
+
+      // Safety
+      if (weight > remaining) {
+        weight = remaining;
+      }
     }
 
     remaining -= weight;
@@ -270,7 +562,13 @@ const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
       date: date.toISOString().split("T")[0],
       name: shuffled[i],
       weightKg: weight,
-      amount: Math.round(weight * rate)
+      amount: Math.round(weight * rate),
+
+      // Save the rate-period information with every entry
+      periodFromDate: fromDate,
+      periodToDate: toDate || fromDate,
+      periodProduct: product,
+      periodRate: Number(rate)
     });
   }
 
@@ -278,50 +576,234 @@ const splitPurchase = (totalKg, rate, count, fromDate, toDate) => {
     (a, b) => new Date(a.date) - new Date(b.date)
   );
 };
+const addPurchaseRatePeriod = () => {
+  if (!fromDate || !purchase.thing || !purchase.kilos || !purchase.ratePerKg || !purchase.entries) {
+    alert(
+      "Please fill From Date, Product, Kilos, Rate and Number of Entries before adding."
+    );
+    return;
+  }
+
+  if (toDate && new Date(toDate) < new Date(fromDate)) {
+    alert("To Date cannot be before From Date.");
+    return;
+  }
+
+  const periodSplits = splitPurchase(
+    Number(purchase.kilos),
+    Number(purchase.ratePerKg),
+    Number(purchase.entries),
+    fromDate,
+    toDate || fromDate,
+    purchase.thing
+  );
+
+  const period = {
+    id: Date.now(),
+    fromDate,
+    toDate: toDate || fromDate,
+    thing: purchase.thing,
+    kilos: Number(purchase.kilos),
+    ratePerKg: Number(purchase.ratePerKg),
+    entries: Number(purchase.entries),
+    company: purchase.company || "",
+    splits: periodSplits,
+    totalKg: periodSplits.reduce(
+      (sum, item) => sum + Number(item.weightKg || 0),
+      0
+    ),
+    totalAmount: periodSplits.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    )
+  };
+
+  setPurchase(prev => {
+    const updatedPeriods = [...prev.ratePeriods, period];
+
+    return {
+      ...prev,
+      ratePeriods: updatedPeriods,
+      splits: [],
+      totalKg: 0,
+      totalAmount: 0,
+
+      // Keep the company
+      company: prev.company
+    };
+  });
+
+  // Clear only the current period fields
+  setFromDate("");
+  setToDate("");
+
+  setPurchase(prev => ({
+    ...prev,
+    thing: "",
+    kilos: "",
+    ratePerKg: "",
+    entries: ""
+  }));
+};
 const savePurchase = async () => {
   if (!db || !firestoreFunctions) {
     alert("Firebase not connected");
     return;
   }
 
-  if (!purchase.kilos || !purchase.ratePerKg || !purchase.entries) {
-    alert("Please fill all required fields");
+  let periods = [
+    ...(purchase.ratePeriods || [])
+  ];
+
+  // If user filled a period but forgot to press +
+  if (
+    fromDate &&
+    purchase.thing &&
+    purchase.kilos &&
+    purchase.ratePerKg &&
+    purchase.entries
+  ) {
+
+    const splits = splitPurchase(
+      Number(purchase.kilos),
+      Number(purchase.ratePerKg),
+      Number(purchase.entries),
+      fromDate,
+      toDate || fromDate,
+      purchase.thing
+    );
+
+    periods.push({
+      id: Date.now(),
+
+      fromDate: fromDate,
+
+      toDate: toDate || fromDate,
+
+      thing: purchase.thing,
+
+      kilos: Number(purchase.kilos),
+
+      ratePerKg:
+        Number(purchase.ratePerKg),
+
+      entries:
+        Number(purchase.entries),
+
+      company:
+        purchase.company || "",
+
+      splits: splits,
+
+      totalKg: splits.reduce(
+        (sum, item) =>
+          sum + Number(
+            item.weightKg || 0
+          ),
+        0
+      ),
+
+      totalAmount: splits.reduce(
+        (sum, item) =>
+          sum + Number(
+            item.amount || 0
+          ),
+        0
+      )
+    });
+  }
+
+  if (periods.length === 0) {
+    alert(
+      "Please add at least one purchase period."
+    );
     return;
   }
 
-  try {
-    const docRef = await firestoreFunctions.addDoc(
-      firestoreFunctions.collection(db, "purchases"),
-      {
-        ...purchase,
-        fromDate,
-        toDate: toDate || fromDate,
-        createdAt: new Date().toISOString(),
-        timestamp: Date.now()
-      }
+  // Calculate overall bill values
+  const allSplits =
+    periods.flatMap(
+      period => period.splits || []
     );
 
-    // ✅ 🔥 ADD THIS (instant UI update)
-    const newPurchase = {
-      id: docRef.id,
-      ...purchase,
-      fromDate,
-      toDate: toDate || fromDate,
-      createdAt: new Date().toISOString(),
-      timestamp: Date.now()
+  const totalKg =
+    allSplits.reduce(
+      (sum, item) =>
+        sum + Number(
+          item.weightKg || 0
+        ),
+      0
+    );
+
+  const totalAmount =
+    allSplits.reduce(
+      (sum, item) =>
+        sum + Number(
+          item.amount || 0
+        ),
+      0
+    );
+
+  try {
+
+    const purchaseData = {
+
+      company:
+        purchase.company || "",
+
+      ratePeriods:
+        periods,
+
+      splits:
+        allSplits,
+
+      totalKg:
+        totalKg,
+
+      totalAmount:
+        totalAmount,
+
+      createdAt:
+        new Date().toISOString(),
+
+      timestamp:
+        Date.now()
     };
 
-    setPurchases(prev => [newPurchase, ...prev]); // 👈 THIS LINE FIXES YOUR ISSUE
+    const docRef =
+      await firestoreFunctions.addDoc(
+        firestoreFunctions.collection(
+          db,
+          "purchases"
+        ),
+        purchaseData
+      );
 
-    alert("✅ Purchase saved successfully");
+    const newPurchase = {
+      id: docRef.id,
+      ...purchaseData
+    };
+
+    setPurchases(prev => [
+      newPurchase,
+      ...prev
+    ]);
+
+    alert(
+      "✅ Purchase saved successfully"
+    );
+
     resetPurchase();
 
   } catch (err) {
+
     console.error(err);
-    alert("❌ Failed to save purchase");
+
+    alert(
+      "❌ Failed to save purchase"
+    );
   }
 };
-
 const formatWeight = (w) => {
   if (!w) return "0.00";
   return (Number(w) / 100).toFixed(2);
@@ -352,43 +834,53 @@ const splitWeight = (totalKg, rate) => {
   return result;
 };
 useEffect(() => {
- const kilos = Number(purchase.kilos);
+  const kilos = Number(purchase.kilos);
   const rate = Number(purchase.ratePerKg);
   const entries = Number(purchase.entries);
 
-  if (!fromDate || kilos <= 0|| rate <= 0 || entries <= 0) {
+  if (
+    !fromDate ||
+    !purchase.thing ||
+    kilos <= 0 ||
+    rate <= 0 ||
+    entries <= 0
+  ) {
     setPurchase(prev => ({
       ...prev,
       splits: [],
+      totalKg: 0,
       totalAmount: 0
     }));
     return;
   }
-const totalKg = kilos;
-  
 
   const splits = splitPurchase(
-    totalKg,
+    kilos,
     rate,
     entries,
     fromDate,
-    toDate
+    toDate || fromDate,
+    purchase.thing
   );
 
   const totalAmount = Math.round(
-  splits.reduce((sum, i) => sum + i.amount, 0)
-);
+    splits.reduce(
+      (sum, item) => sum + Number(item.amount || 0),
+      0
+    )
+  );
 
   setPurchase(prev => ({
     ...prev,
-    totalKg,
     splits,
+    totalKg: kilos,
     totalAmount
   }));
 }, [
   purchase.kilos,
   purchase.ratePerKg,
   purchase.entries,
+  purchase.thing,
   fromDate,
   toDate
 ]);
@@ -2395,16 +2887,82 @@ ${text}
     />
 
     {/* Rate */}
-    <input
-      type="number"
-      placeholder="Rate per Kg"
-      value={purchase.ratePerKg}
-      onChange={e =>
-        setPurchase({ ...purchase, ratePerKg: e.target.value })
-      }
-      className="border px-3 py-2 rounded w-full"
-    />
+    {/* Rate */}
+<div className="flex gap-2 items-center">
+  <input
+    type="number"
+    placeholder="Rate per Kg"
+    value={purchase.ratePerKg}
+    onChange={e =>
+      setPurchase({
+        ...purchase,
+        ratePerKg: e.target.value
+      })
+    }
+    className="border px-3 py-2 rounded w-full"
+  />
 
+  <button
+    type="button"
+    onClick={addPurchaseRatePeriod}
+    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xl font-bold hover:bg-blue-700"
+    title="Add another date/rate period"
+  >
+    +
+  </button>
+</div>
+{/* ===== ADDED PURCHASE PERIODS ===== */}
+{purchase.ratePeriods.length > 0 && (
+  <div className="mt-4 border rounded-lg p-4 bg-blue-50">
+
+    <h3 className="font-bold text-lg mb-3">
+      📋 Added Purchase Periods
+    </h3>
+
+    <div className="space-y-2">
+      {purchase.ratePeriods.map((period, index) => (
+        <div
+          key={period.id}
+          className="bg-white border rounded-lg p-3 flex items-center justify-between"
+        >
+          <div>
+            <p className="font-semibold">
+              {index + 1}. {period.thing}
+            </p>
+
+            <p className="text-sm text-gray-600">
+              {period.fromDate} → {period.toDate}
+            </p>
+
+            <p className="text-sm">
+              Rate: ₹{period.ratePerKg}/Kg
+              {" | "}
+              Weight: {period.totalKg} Kg
+              {" | "}
+              Amount: ₹{period.totalAmount}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setPurchase(prev => ({
+                ...prev,
+                ratePeriods: prev.ratePeriods.filter(
+                  p => p.id !== period.id
+                )
+              }));
+            }}
+            className="bg-red-500 text-white px-3 py-1 rounded"
+          >
+            🗑️
+          </button>
+        </div>
+      ))}
+    </div>
+
+  </div>
+)}
     {/* Totals + Buttons */}
     <div className="flex items-center justify-between border-t pt-4 mt-4">
       <div>
@@ -2459,17 +3017,19 @@ ${text}
     {/* ===== SAVED PURCHASES LIST ===== */}
 
     <div className="mt-6">
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-xl font-bold">📦 Saved Purchases</h2>
+     <div className="flex justify-between items-center mb-3">
+  <h2 className="text-xl font-bold">
+    📦 Saved Purchases
+  </h2>
 
-        {/* ✅ DOWNLOAD BUTTON */}
-        {/* <button
-          onClick={downloadPurchasePDF}
-          className="bg-red-600 text-white px-4 py-2 rounded"
-        >
-          📄 Download PDF
-        </button> */}
-      </div>
+  <button
+    onClick={downloadAllPurchasesExcel}
+    disabled={!purchases.length}
+    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+  >
+    📊 Download All Excel
+  </button>
+</div>
 
       {/* ✅ WRAP ONLY THIS PART */}
       <div id="purchase-pdf">
@@ -2498,16 +3058,184 @@ ${text}
           </div>
         </div>
 
-        <p className="text-lg"><b>From:</b> {p.fromDate}</p>
-        <p className="text-lg"><b>To:</b> {p.toDate}</p>
-        <p className="text-lg"><b>பொருள்:</b> {p.thing}</p>
-        {/* <p className="text-lg"><b>Entries:</b> {p.entries}</p> */}
-        <p className="text-lg"><b>Company:</b> {p.company}</p>
-        <p className="text-lg"><b>மொத்த எடை:</b> {p.totalKg}</p>
-        <p className="text-lg"><b>விலை:</b> ₹{p.ratePerKg}</p>
-        <p className="text-lg text-green-600 font-bold">
-          Total Amount: ₹{p.totalAmount}
+        {/* ===== PURCHASE PERIODS ===== */}
+
+{p.ratePeriods && p.ratePeriods.length > 0 ? (
+
+  <div className="space-y-4">
+
+    {p.ratePeriods.map((period, periodIndex) => (
+
+      <div
+        key={period.id || periodIndex}
+        className="border rounded-lg p-4 bg-white"
+      >
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+
+          <p className="text-lg">
+            <b>From:</b>{" "}
+            {period.fromDate || "-"}
+          </p>
+
+          <p className="text-lg">
+            <b>To:</b>{" "}
+            {period.toDate || "-"}
+          </p>
+
+          <p className="text-lg">
+            <b>பொருள்:</b>{" "}
+            {period.thing || "-"}
+          </p>
+
+          <p className="text-lg">
+            <b>Company:</b>{" "}
+            {period.company || p.company || "-"}
+          </p>
+
+          <p className="text-lg">
+            <b>மொத்த எடை:</b>{" "}
+            {period.totalKg || 0} Kg
+          </p>
+
+          <p className="text-lg">
+            <b>விலை:</b>{" "}
+            ₹{period.ratePerKg || 0}/Kg
+          </p>
+
+        </div>
+
+        <p className="text-lg text-green-600 font-bold mt-2">
+          Total Amount: ₹
+          {Number(
+            period.totalAmount || 0
+          ).toLocaleString("en-IN")}
         </p>
+
+        {period.splits &&
+          period.splits.length > 0 && (
+
+          <table className="w-full border mt-3 text-base">
+
+            <thead className="bg-gray-200">
+              <tr>
+                <th className="border p-2">
+                  Date
+                </th>
+
+                <th className="border p-2">
+                  Name
+                </th>
+
+                <th className="border p-2">
+                  Weight
+                </th>
+
+                <th className="border p-2">
+                  Rate
+                </th>
+
+                <th className="border p-2">
+                  Amount
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              {period.splits.map(
+                (s, i) => (
+
+                <tr key={i}>
+
+                  <td className="border p-2">
+                    {s.date}
+                  </td>
+
+                  <td className="border p-2">
+                    {s.name}
+                  </td>
+
+                  <td className="border p-2">
+                    {formatWeight(
+                      s.weightKg
+                    )}
+                  </td>
+
+                  <td className="border p-2">
+                    ₹{period.ratePerKg}
+                  </td>
+
+                  <td className="border p-2">
+                    ₹
+                    {Number(
+                      s.amount || 0
+                    ).toLocaleString(
+                      "en-IN"
+                    )}
+                  </td>
+
+                </tr>
+
+              ))}
+
+            </tbody>
+
+          </table>
+
+        )}
+
+      </div>
+
+    ))}
+
+  </div>
+
+) : (
+
+  // Old purchase records
+  <div>
+
+    <p className="text-lg">
+      <b>From:</b>{" "}
+      {p.fromDate || "-"}
+    </p>
+
+    <p className="text-lg">
+      <b>To:</b>{" "}
+      {p.toDate || "-"}
+    </p>
+
+    <p className="text-lg">
+      <b>பொருள்:</b>{" "}
+      {p.thing || "-"}
+    </p>
+
+    <p className="text-lg">
+      <b>Company:</b>{" "}
+      {p.company || "-"}
+    </p>
+
+    <p className="text-lg">
+      <b>மொத்த எடை:</b>{" "}
+      {p.totalKg || 0} Kg
+    </p>
+
+    <p className="text-lg">
+      <b>விலை:</b>{" "}
+      ₹{p.ratePerKg || 0}/Kg
+    </p>
+
+    <p className="text-lg text-green-600 font-bold">
+      Total Amount: ₹
+      {Number(
+        p.totalAmount || 0
+      ).toLocaleString("en-IN")}
+    </p>
+
+  </div>
+
+)}
 
         {p.splits && p.splits.length > 0 && (
           <table className="w-full border mt-3 text-base">
